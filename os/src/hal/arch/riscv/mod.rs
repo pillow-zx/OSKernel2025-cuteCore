@@ -7,6 +7,7 @@ pub mod timer;
 pub mod config;
 pub mod sv39;
 pub mod kernel_stack;
+pub mod sync;
 
 pub fn bootstrap_init() {}
 

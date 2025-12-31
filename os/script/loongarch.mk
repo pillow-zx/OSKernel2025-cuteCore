@@ -3,7 +3,7 @@ MODE := release
 KERNEL_ELF := target/loongarch64-unknown-none/$(MODE)/os
 KERNEL_BIN := $(KERNEL_ELF).bin
 
-BOARD := laqemu
+BOARD := 2k1000
 SBI ?=
 BOOTLOADER := ../bootloader/u-boot-with-spl.bin
 

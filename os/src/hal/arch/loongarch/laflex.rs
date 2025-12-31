@@ -181,7 +181,7 @@ impl From<usize> for LAPTRoot {
 }
 pub struct LAFlexPageTable {
     root_ppn: LAPTRoot,
-    frames: Vec<Arc<FrameTracker>>,
+    frames: Vec<FrameTracker>,
 }
 
 /// Assume that it won't encounter oom when creating/mapping.

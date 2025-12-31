@@ -231,3 +231,14 @@ pub extern "C" fn trap_from_kernel(gr: &mut GeneralRegs) {
         }
     );
 }
+
+#[no_mangle]
+pub fn trap_handler() -> ! {
+    trap_return();
+    unreachable!()
+}
+
+#[no_mangle]
+pub fn trap_return() {
+    todo!()
+}

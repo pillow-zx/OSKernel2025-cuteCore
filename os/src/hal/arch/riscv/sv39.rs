@@ -1,6 +1,5 @@
 use crate::mm::{FrameTracker, PhysAddr, PhysPageNum, StepByOne, VirtAddr, VirtPageNum, frame_alloc, PageTable, MapPermission};
 use alloc::string::String;
-use alloc::sync::Arc;
 use alloc::vec;
 use alloc::vec::Vec;
 use core::arch::asm;
@@ -59,7 +58,7 @@ impl PageTableEntry {
 
 pub struct SV39PageTable {
     root_ppn: PhysPageNum,
-    frames: Vec<Arc<FrameTracker>>,
+    frames: Vec<FrameTracker>,
 }
 
 

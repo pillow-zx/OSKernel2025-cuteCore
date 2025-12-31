@@ -1,13 +1,12 @@
+use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
-use spin::Mutex;
 use bitflags::bitflags;
 use lazy_static::lazy_static;
 use crate::hal::{PageTableEntryImpl, PageTableImpl, MEMORY_END, MMIO, PAGE_SIZE, TRAMPOLINE};
 use crate::mm::address::VPNRange;
-use crate::mm::{frame_alloc, PageTable, PhysAddr, PhysPageNum, StepByOne, VirtAddr, VirtPageNum};
-
-
+use crate::mm::{frame_alloc, FrameTracker, PageTable, PhysAddr, PhysPageNum, StepByOne, VirtAddr, VirtPageNum};
+use crate::sync::UPIntrFreeCell;
 
 extern "C" {
     fn stext();
@@ -22,19 +21,14 @@ extern "C" {
     fn strampoline();
 }
 
-
-
-
 lazy_static! {
-    pub static ref KERNEL_SPACE: Arc<Mutex<MemorySet<PageTableImpl>>> =
-        Arc::new(Mutex::new(MemorySet::new_kernel()));
+    pub static ref KERNEL_SPACE: Arc<UPIntrFreeCell<MemorySet<PageTableImpl>>> =
+        Arc::new(unsafe { UPIntrFreeCell::new(MemorySet::new_kernel()) });
 }
 
 pub fn kernel_token() -> usize {
-    KERNEL_SPACE.lock().token()
+    KERNEL_SPACE.exclusive_access().token()
 }
-
-
 
 pub struct MemorySet<T: PageTable> {
     page_table: T,
@@ -249,7 +243,7 @@ impl<T: PageTable> MemorySet<T> {
 
 pub struct MapArea {
     vpn_range: VPNRange,
-    // data_frames: BTreeMap<VirtPageNum, FrameTracker>,
+    data_frames: BTreeMap<VirtPageNum, FrameTracker>,
     map_type: MapType,
     map_perm: MapPermission,
 }
@@ -266,7 +260,7 @@ impl MapArea {
         let end_vpn: VirtPageNum = end_va.ceil();
         Self {
             vpn_range: VPNRange::new(start_vpn, end_vpn),
-            // data_frames: BTreeMap::new(),
+            data_frames: BTreeMap::new(),
             map_type,
             map_perm,
         }
@@ -274,7 +268,7 @@ impl MapArea {
     pub fn from_another(another: &MapArea) -> Self {
         Self {
             vpn_range: VPNRange::new(another.vpn_range.get_start(), another.vpn_range.get_end()),
-            // data_frames: BTreeMap::new(),
+            data_frames: BTreeMap::new(),
             map_type: another.map_type,
             map_perm: another.map_perm,
         }
@@ -288,7 +282,7 @@ impl MapArea {
             MapType::Framed => {
                 let frame = frame_alloc().unwrap();
                 ppn = frame.ppn;
-                // self.data_frames.insert(vpn, frame);
+                self.data_frames.insert(vpn, frame);
             }
             MapType::Linear(pn_offset) => {
                 // check for sv39
@@ -301,7 +295,7 @@ impl MapArea {
     }
     pub fn unmap_one<T: PageTable>(&mut self, page_table: &mut T, vpn: VirtPageNum) {
         if self.map_type == MapType::Framed {
-            // self.data_frames.remove(&vpn);
+            self.data_frames.remove(&vpn);
         }
         page_table.unmap(vpn);
     }

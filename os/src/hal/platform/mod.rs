@@ -2,11 +2,12 @@
 #[cfg(feature = "board_rvqemu")]
 pub mod riscv;
 
-#[cfg(feature = "board_laqemu")]
-pub mod loongarch;
-
 #[cfg(feature = "board_rvqemu")]
 pub use riscv::qemu::*;
+
+
+#[cfg(feature = "loongarch")]
+pub mod loongarch;
 
 #[cfg(feature = "board_laqemu")]
 pub use loongarch::qemu::*;

@@ -1,5 +1,4 @@
-use crate::config::HIGH_BASE_EIGHT;
-use crate::config::PAGE_SIZE;
+use crate::hal::{HIGH_BASE_EIGHT, PAGE_SIZE};
 
 pub const MMIO: &[(usize, usize)] = &[
     (0x400E_0000, 0x1_0000)

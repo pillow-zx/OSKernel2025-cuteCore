@@ -1,20 +1,21 @@
 pub mod trap;
 pub mod config;
 pub mod sbi;
-mod boot;
 pub mod timer;
-mod tlb;
 pub mod kernel_stack;
+pub mod sync;
+mod boot;
+mod tlb;
 mod merrera;
 mod laflex;
 
+
 use loongArch64::register::{cpuid, crmd, dmw2, ecfg, euen, misc, prcfg1, pwch, pwcl, rvacfg, stlbps, tcfg, ticlr, tlbrehi, tlbrentry, MemoryAccessType};
 use loongArch64::register::ecfg::LineBasedInterrupt;
-use crate::hal::arch::loongarch::config::{DIR_WIDTH, MMAP_BASE, PTE_WIDTH, PTE_WIDTH_BITS, SUC_DMW_VSEG};
-use crate::hal::arch::loongarch::timer::get_timer_freq_first_time;
-use crate::hal::arch::loongarch::trap::{set_kernel_trap_entry, set_machine_error_trap_entry};
-use crate::hal::PAGE_SIZE_BITS;
-use crate::hal::paltform::UART_BASE;
+use config::{DIR_WIDTH, MMAP_BASE, PTE_WIDTH, PTE_WIDTH_BITS, SUC_DMW_VSEG, PAGE_SIZE_BITS};
+use timer::get_timer_freq_first_time;
+use trap::{set_kernel_trap_entry, set_machine_error_trap_entry};
+use crate::hal::platform::UART_BASE;
 
 extern "C" {
     pub fn srfill();

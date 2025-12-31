@@ -9,6 +9,8 @@ pub use riscv::{
     config::{USER_STACK_SIZE, KERNEL_HEAP_SIZE, KERNEL_STACK_SIZE, PAGE_SIZE, PAGE_SIZE_BITS, TRAMPOLINE, TRAP_CONTEXT_BASE, MEMORY_END},
     PageTableImpl, PageTableEntryImpl,
     kernel_stack::{KernelStack, kstack_alloc},
+    trap::{trap_return, trap_handler},
+    sync::INTR_MASKING_INFO,
 };
 
 
@@ -25,4 +27,7 @@ pub use loongarch::{
     },
     sbi::{console_getchar, console_putchar, console_flush, shutdown},
     timer::{get_time, get_clock_freq},
+    kernel_stack::{kstack_alloc, KernelStack},
+    trap::{trap_return, trap_handler},
+    sync::INTR_MASKING_INFO,
 };

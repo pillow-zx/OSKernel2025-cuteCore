@@ -4,9 +4,8 @@
 #![feature(alloc_error_handler)]
 #![feature(asm_const)]
 
-
-extern crate core;
 extern crate alloc;
+extern crate core;
 
 use crate::hal::shutdown;
 
@@ -14,9 +13,8 @@ use crate::hal::shutdown;
 pub mod console;
 mod hal;
 mod lang_items;
-mod timer;
 mod task;
-mod mm;
+mod timer;
 
 fn clear_bss() {
     extern "C" {
@@ -24,10 +22,19 @@ fn clear_bss() {
         fn ebss();
     }
     unsafe {
-        core::slice::from_raw_parts_mut(sbss as usize as *mut u8, ebss as usize - sbss as usize)
-            .fill(0);
+        core::slice::from_raw_parts_mut(
+            sbss as *const () as usize as *mut u8,
+            ebss as *const () as usize - sbss as usize,
+        )
+        .fill(0);
     }
 }
+
+mod fs;
+mod mm;
+mod sync;
+mod syscall;
+mod drivers;
 
 #[no_mangle]
 pub fn rust_main() -> ! {

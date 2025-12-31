@@ -1,11 +1,12 @@
 use alloc::vec::Vec;
 use lazy_static::lazy_static;
-use spin::Mutex;
 use crate::hal::{KERNEL_STACK_SIZE, PAGE_SIZE, TRAMPOLINE};
 use crate::mm::{MapPermission, VirtAddr, KERNEL_SPACE};
+use crate::sync::UPIntrFreeCell;
 
 lazy_static! {
-    static ref KSTACK_ALLOCATOR: Mutex<RecycleAllocator> = Mutex::new(RecycleAllocator::new());
+    static ref KSTACK_ALLOCATOR: UPIntrFreeCell<RecycleAllocator> =
+        unsafe { UPIntrFreeCell::new(RecycleAllocator::new()) };
 }
 
 struct RecycleAllocator {
@@ -14,9 +15,9 @@ struct RecycleAllocator {
 }
 
 pub fn kstack_alloc() -> KernelStack {
-    let kstack_id = KSTACK_ALLOCATOR.lock().alloc();
+    let kstack_id = KSTACK_ALLOCATOR.exclusive_access().alloc();
     let (kstack_bottom, kstack_top) = kernel_stack_position(kstack_id);
-    KERNEL_SPACE.lock().insert_framed_area(
+    KERNEL_SPACE.exclusive_access().insert_framed_area(
         kstack_bottom.into(),
         kstack_top.into(),
         MapPermission::R | MapPermission::W,
@@ -65,8 +66,8 @@ impl Drop for KernelStack {
         let (kernel_stack_bottom, _) = kernel_stack_position(self.0);
         let kernel_stack_bottom_va: VirtAddr = kernel_stack_bottom.into();
         KERNEL_SPACE
-            .lock()
+            .exclusive_access()
             .remove_area_with_start_vpn(kernel_stack_bottom_va.into());
-        KSTACK_ALLOCATOR.lock().dealloc(self.0);
+        KSTACK_ALLOCATOR.exclusive_access().dealloc(self.0);
     }
 }

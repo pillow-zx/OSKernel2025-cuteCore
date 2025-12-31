@@ -1,9 +1,9 @@
-use crate::hal::paltform;
+use crate::hal::platform;
 use core::arch::asm;
 
 
 // Sizes
-pub const MEMORY_SIZE: usize = paltform::MEM_SIZE;
+pub const MEMORY_SIZE: usize = platform::MEM_SIZE;
 pub const USER_STACK_SIZE: usize = PAGE_SIZE * 0x40;
 pub const USER_HEAP_SIZE: usize = PAGE_SIZE * 0x20;
 pub const SYSTEM_TASK_LIMIT: usize = 128;
@@ -19,8 +19,8 @@ pub const KSTACK_PG_NUM_SHIFT: usize = 16usize.trailing_zeros() as usize;
 #[cfg(not(debug_assertions))]
 pub const KSTACK_PG_NUM_SHIFT: usize = 16usize.trailing_zeros() as usize;
 
-pub const KERNEL_STACK_SIZE: usize = paltform::KERNEL_STACK_SIZE;
-pub const KERNEL_HEAP_SIZE: usize = paltform::KERNEL_HEAP_SIZE;
+pub const KERNEL_STACK_SIZE: usize = platform::KERNEL_STACK_SIZE;
+pub const KERNEL_HEAP_SIZE: usize = platform::KERNEL_HEAP_SIZE;
 
 // Addresses
 /// Maximum length of a physical address
@@ -50,7 +50,7 @@ pub const SUC_DMW_VSEG: usize = 8;
 pub const MEMORY_HIGH_BASE: usize = HIGH_BASE_ZERO;
 pub const MEMORY_HIGH_BASE_VPN: usize = MEMORY_HIGH_BASE >> PAGE_SIZE_BITS;
 pub const USER_STACK_BASE: usize = TASK_SIZE - PAGE_SIZE | LA_START;
-pub const MEMORY_START: usize = paltform::MEM_START;
+pub const MEMORY_START: usize = platform::MEM_START;
 pub const MEMORY_END: usize = MEMORY_SIZE + MEMORY_START;
 
 pub const SV39_SPACE: usize = 1 << 39;
@@ -71,7 +71,7 @@ pub const MMAP_END: usize = 0xFFFF_FFFF_FFFF_0000;
 pub const SKIP_NUM: usize = 1;
 
 // 0x98000000
-pub const DISK_IMAGE_BASE: usize = paltform::DISK_IMAGE_BASE;
+pub const DISK_IMAGE_BASE: usize = platform::DISK_IMAGE_BASE;
 // 256
 pub const BUFFER_CACHE_NUM: usize = 256 * 1024 * 1024 / 2048 * 4 / 2048;
 

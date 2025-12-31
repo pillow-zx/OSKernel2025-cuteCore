@@ -4,44 +4,39 @@ use crate::hal::MEMORY_END;
 use alloc::vec::Vec;
 use core::fmt::{self, Debug, Formatter};
 use lazy_static::*;
-use spin::RwLock;
+use crate::sync::UPIntrFreeCell;
 
 lazy_static! {
-    pub static ref FRAME_ALLOCATOR: RwLock<FrameAllocatorImpl> =
-        RwLock::new(FrameAllocatorImpl::new());
+    pub static ref FRAME_ALLOCATOR: UPIntrFreeCell<FrameAllocatorImpl> =
+        unsafe { UPIntrFreeCell::new(FrameAllocatorImpl::new()) };
 }
 
 pub fn init_frame_allocator() {
     extern "C" {
         fn ekernel();
     }
-    FRAME_ALLOCATOR.write().init(
-        PhysAddr::from(ekernel as usize).ceil(),
+    FRAME_ALLOCATOR.exclusive_access().init(
+        PhysAddr::from(ekernel as *const() as usize).ceil(),
         PhysAddr::from(MEMORY_END).floor(),
     );
 }
 
-pub fn frame_alloc() -> Option<Arc<FrameTracker>> {
+pub fn frame_alloc() -> Option<FrameTracker> {
     FRAME_ALLOCATOR
-        .write()
+        .exclusive_access()
         .alloc()
-        .map(|t| Arc::new(FrameTracker::new(t)))
+        .map(FrameTracker::new)
 }
 
-pub fn frame_alloc_more(num: usize) -> Option<Vec<Arc<FrameTracker>>> {
-    let mut frames = Vec::with_capacity(num);
-    for _ in 0..num {
-        if let Some(frame_tracker) = frame_alloc() {
-            frames.push(frame_tracker);
-        } else {
-            return None;
-        }
-    }
-    Some(frames)
+pub fn frame_alloc_more(num: usize) -> Option<Vec<FrameTracker>> {
+    FRAME_ALLOCATOR
+        .exclusive_access()
+        .alloc_more(num)
+        .map(|x| x.iter().map(|&t| FrameTracker::new(t)).collect())
 }
 
 pub fn frame_dealloc(ppn: PhysPageNum) {
-    FRAME_ALLOCATOR.write().dealloc(ppn);
+    FRAME_ALLOCATOR.exclusive_access().dealloc(ppn);
 }
 
 
