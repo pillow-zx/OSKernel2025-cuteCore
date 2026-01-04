@@ -26,7 +26,7 @@ mmd -i ${U_FS_DIR}/${U_FS} ::/bin
 for program_rs in $(ls ${TEST_DIR}); do
     # 移除 .rs 后缀获取二进制文件名
     program_name=${program_rs%.rs}
-    
+
     # 检查 ELF 文件是否存在再拷贝
     if [ -f "${ELF_DIR}/${program_name}" ]; then
         echo "Copying ${program_name} to image..."
@@ -34,6 +34,10 @@ for program_rs in $(ls ${TEST_DIR}); do
     else
         echo "Warning: ${program_name} not found in ${ELF_DIR}"
     fi
+done
+
+for program in $(ls ../test/testsuits-for-oskernel/riscv-syscalls-testing/user/riscv64); do
+    mcopy -i ${U_FS_DIR}/${U_FS} ../test/testsuits-for-oskernel/riscv-syscalls-testing/user/riscv64/${program} ::/
 done
 
 echo "DONE"
