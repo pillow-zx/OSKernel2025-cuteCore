@@ -24,7 +24,32 @@ pub fn sys_yield() -> isize {
 pub fn sys_getpid() -> isize {
     current_task().unwrap().process.upgrade().unwrap().getpid() as isize
 }
+/// brk 用于设置或获取当前进程的数据段（堆）的结束地址,成功返回新的堆顶地址，失败返回 -1
+/// 如果传入的 addr 为 0，则返回当前堆顶地址
+pub fn sys_brk(addr:usize) -> isize {
+    let task = current_task().unwrap();
+    let process = task.process.upgrade().unwrap();
+    let mut inner = process.inner_exclusive_access();
 
+    let memory_set = &mut inner.memory_set;
+    //相当于查看当前堆顶是多少
+    if addr == 0 {
+        return memory_set.brk as isize;
+    }
+
+    if addr < memory_set.brk {
+        return memory_set.brk as isize;
+    }
+    // 扩展堆
+    let old_brk = memory_set.brk;
+    if memory_set.expand_heap(addr).is_err() {
+        return -1;
+    }
+
+    memory_set.brk = addr;
+    addr as isize
+
+}
 
 pub fn sys_fork() -> isize {
     let current_process = current_process();

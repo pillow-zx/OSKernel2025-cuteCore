@@ -48,7 +48,7 @@
 //! - 任务访问：通过 `get_task(tid)` 获取特定线程
 
 use crate::fs::{File, Stdin, Stdout};
-use crate::hal::{trap_handler, PageTableImpl, TrapContext};
+use crate::hal::{trap_handler, PageTableImpl, TrapContext, UserStackBase};
 use crate::mm::{translated_refmut, MemorySet, KERNEL_SPACE};
 use crate::sync::{Condvar, Mutex, Semaphore, UPIntrFreeCell, UPIntrRefMut};
 use crate::task::manager::{add_task, insert_into_pid2process};
@@ -103,7 +103,7 @@ impl ProcessControlBlock {
     /// - `Arc<Self>`：新建进程 PCB
     pub fn new(elf_data: &[u8]) -> Arc<Self> {
         // memory_set with elf program headers/trampoline/trap context/user stack
-        let (memory_set, ustack_base, entry_point) = MemorySet::from_elf(elf_data);
+        let (memory_set, entry_point) = MemorySet::from_elf(elf_data);
         // allocate a pid
         let pid_handle = pid_alloc();
         let process = Arc::new(Self {
@@ -137,7 +137,7 @@ impl ProcessControlBlock {
         /// 创建主线程
         let task = Arc::new(TaskControlBlock::new(
             Arc::clone(&process),
-            ustack_base,
+            UserStackBase,
             true,
         ));
 
@@ -170,7 +170,7 @@ impl ProcessControlBlock {
     pub fn exec(self: &Arc<Self>, elf_data: &[u8], args: Vec<String>) {
         assert_eq!(self.inner_exclusive_access().thread_count(), 1);
         // 通过 ELF 数据创建新的地址空间，获得新的用户栈基址和程序入口点
-        let (memory_set, ustack_base, entry_point) = MemorySet::from_elf(elf_data);
+        let (memory_set, entry_point) = MemorySet::from_elf(elf_data);
         let new_token = memory_set.token();
         // 更新进程地址空间
         self.inner_exclusive_access().memory_set = memory_set;
@@ -179,7 +179,8 @@ impl ProcessControlBlock {
         let task = self.inner_exclusive_access().get_task(0);
         let mut task_inner = task.inner_exclusive_access();
         // 更新用户栈基址
-        task_inner.res.as_mut().unwrap().ustack_base = ustack_base;
+        // 用户栈基地址已经被写死了，所以不再需要更新
+        // task_inner.res.as_mut().unwrap().ustack_base = ustack_base;
         // 分配用户资源（用户栈 + trap 上下文）
         task_inner.res.as_mut().unwrap().alloc_user_res();
         task_inner.trap_cx_ppn = task_inner.res.as_mut().unwrap().trap_cx_ppn();
@@ -238,6 +239,9 @@ impl ProcessControlBlock {
                 new_fd_table.push(None);
             }
         }
+        let mut memory_set = memory_set;
+        memory_set.heap_start = parent.memory_set.heap_start;
+        memory_set.brk = parent.memory_set.brk;
         // create child process pcb
         let child = Arc::new(Self {
             pid,
@@ -261,6 +265,12 @@ impl ProcessControlBlock {
         });
         // add child
         parent.children.push(Arc::clone(&child));
+        let parent_task = parent.get_task(0);
+        let (ustack_base, ustack_top) = {
+            let task_inner = parent_task.inner_exclusive_access();
+            let res = task_inner.res.as_ref().unwrap();
+            (res.ustack_base(), res.ustack_top())
+        };
         // create main thread of child process
         let task = Arc::new(TaskControlBlock::new(
             Arc::clone(&child),

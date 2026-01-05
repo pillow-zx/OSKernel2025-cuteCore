@@ -25,7 +25,7 @@
 //! - 回收的 ID 仅在完全释放后才会被重新使用。
 //! - 内核栈在使用期间，虚拟地址范围始终完整映射。
 
-use crate::hal::{KERNEL_STACK_SIZE, PAGE_SIZE, TRAMPOLINE, TRAP_CONTEXT_BASE, USER_STACK_SIZE};
+use crate::hal::{UserStackBase, KERNEL_STACK_SIZE, PAGE_SIZE, TRAMPOLINE, TRAP_CONTEXT_BASE, USER_STACK_SIZE};
 use crate::mm::{MapPermission, VirtAddr, KERNEL_SPACE};
 use crate::sync::UPIntrFreeCell;
 use alloc::vec::Vec;
@@ -150,8 +150,8 @@ pub fn trap_cx_bottom_from_tid(tid: usize) -> usize {
 ///
 /// # Returns
 /// 用户栈底部虚拟地址
-pub fn ustack_bottom_from_tid(ustack_base: usize, tid: usize) -> usize {
-    ustack_base + tid * (PAGE_SIZE + USER_STACK_SIZE)
+pub fn ustack_bottom_from_tid( tid: usize) -> usize {
+    UserStackBase + tid * (PAGE_SIZE + USER_STACK_SIZE)
 }
 
 impl KernelStack {

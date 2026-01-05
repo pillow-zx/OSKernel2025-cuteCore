@@ -28,7 +28,7 @@ pub fn trap_cx_bottom_from_tid(tid: usize) -> usize {
 
 /// 根据线程id计算用户栈的地址
 pub fn ustack_bottom_from_tid(tid: usize) -> usize {
-    USER_STACK_BASE - tid * (PAGE_SIZE + USER_STACK_SIZE)
+    USER_STACK_BASE + tid * (PAGE_SIZE + USER_STACK_SIZE)
 }
 
 #[inline(always)]
