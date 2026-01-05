@@ -11,4 +11,4 @@ run:
 
 clean:
 	@cd os && make clean
-	@#cd ${RISCVTESTS} && make clean
+	@cd ${RISCVTESTS} && make clean
