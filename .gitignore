@@ -4,3 +4,5 @@ os/target/
 easy-fs/target/
 easy-fs-fuse/target/
 user/target/
+build/
+riscv64/

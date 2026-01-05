@@ -1,4 +1,4 @@
-
+all: pre build run
 
 pre:
 	@cd ${RISCVTESTS} && bash ./build-oscomp.sh
@@ -11,4 +11,4 @@ run:
 
 clean:
 	@cd os && make clean
-	@cd ${RISCVTESTS} && make clean
+	@#cd ${RISCVTESTS} && make clean

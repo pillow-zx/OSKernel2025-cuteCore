@@ -5,7 +5,7 @@ app_dir = src
 src_dir := build/$(ARCH)
 bin_dir := build/bin
 out_dir := target
-cmake_build_args := -DARCH=$(ARCH) -DCHAPTER=$(CHAPTER)
+cmake_build_args := -DCMAKE_TOOLCHAIN_FILE=../riscv64-toolchain.cmake -DARCH=$(ARCH) -DCHAPTER=$(CHAPTER)
 ifeq ($(MODE), release)
 cmake_build_args += -DCMAKE_BUILD_TYPE=Release
 else ifeq ($(MODE), debug)
@@ -50,7 +50,7 @@ binary:
 	@cd build && cmake $(cmake_build_args) .. && make
 	@$(CP) src/oscomp/run-all.sh src/oscomp/text.txt build/riscv64/
 	@mkdir build/riscv64/mnt && touch build/riscv64/mnt/test_mount
-	@ln -s build/riscv64/ .
+	@#ln -s build/riscv64/ .
 
 pre:
 	@rm -rf $(out_dir)
