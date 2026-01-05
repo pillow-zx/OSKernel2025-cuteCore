@@ -20,8 +20,8 @@
 //! - ELF 加载区域假设合法且与用户栈、trap_context 不冲突
 //! - Framed 类型映射的页帧在 `MapArea` 内部追踪，确保不会泄漏
 
-use crate::hal::{PageTableEntryImpl, PageTableImpl, MEMORY_END, MMIO, PAGE_SIZE, TRAMPOLINE};
-use crate::mm::address::VPNRange;
+use crate::hal::{PageTableEntryImpl, PageTableImpl, MEMORY_END, MMIO, PAGE_SIZE, TRAMPOLINE, UserStackBase, TRAP_CONTEXT_BASE};
+use crate::mm::address::{VPNRange,align_up};
 use crate::mm::{
     frame_alloc, FrameTracker, PageTable, PhysAddr, PhysPageNum, StepByOne, VirtAddr, VirtPageNum,
 };
@@ -31,6 +31,7 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 use bitflags::bitflags;
 use lazy_static::lazy_static;
+use log::info;
 
 // 内核段符号，由链接脚本提供
 extern "C" {
@@ -71,6 +72,10 @@ pub struct MemorySet<T: PageTable> {
     page_table: T,
     /// 管理的 MapArea 列表
     areas: Vec<MapArea>,
+    /// 堆顶地址
+    pub brk: usize,
+    /// 堆起始地址
+    pub heap_start: usize,
 }
 
 impl<T: PageTable> MemorySet<T> {
@@ -79,6 +84,8 @@ impl<T: PageTable> MemorySet<T> {
         Self {
             page_table: T::new_kernel(),
             areas: Vec::new(),
+            brk:0,
+            heap_start:0,
         }
     }
 
@@ -130,6 +137,22 @@ impl<T: PageTable> MemorySet<T> {
             // PTEFlags::R | PTEFlags::X,
             MapPermission::R | MapPermission::X,
         );
+    }
+    /// 扩展堆区到 new_brk
+    pub fn expand_heap(&mut self, new_brk: usize) -> Result<(), ()> {
+        let old_brk = self.brk;
+
+        let old_page = align_up(old_brk, PAGE_SIZE);
+        let new_page = align_up(new_brk, PAGE_SIZE);
+
+        if new_page > old_page {
+            self.insert_framed_area(
+                old_page.into(),
+                new_page.into(),
+                MapPermission::R | MapPermission::W | MapPermission::U,
+            );
+        }
+        Ok(())
     }
 
     /// 构建内核空间 MemorySet，不包含内核栈
@@ -208,7 +231,7 @@ impl<T: PageTable> MemorySet<T> {
 
     /// 从 ELF 数据构建用户空间 MemorySet
     /// 返回 (MemorySet, user_stack_base, entry_point)
-    pub fn from_elf(elf_data: &[u8]) -> (Self, usize, usize) {
+    pub fn from_elf(elf_data: &[u8]) -> (Self,  usize) {
         let mut memory_set = Self::new_bare();
         // map trampoline
         memory_set.map_trampoline();
@@ -219,6 +242,7 @@ impl<T: PageTable> MemorySet<T> {
         assert_eq!(magic, [0x7f, 0x45, 0x4c, 0x46], "invalid elf!");
         let ph_count = elf_header.pt2.ph_count();
         let mut max_end_vpn = VirtPageNum(0);
+        // 映射每一个段
         for i in 0..ph_count {
             let ph = elf.program_header(i).unwrap();
             if ph.get_type().unwrap() == xmas_elf::program::Type::Load {
@@ -236,7 +260,9 @@ impl<T: PageTable> MemorySet<T> {
                     map_perm |= MapPermission::X;
                 }
                 let map_area = MapArea::new(start_va, end_va, MapType::Framed, map_perm);
-                max_end_vpn = map_area.vpn_range.get_end();
+                // 选择最大的作为结束虚拟页号
+                max_end_vpn = max_end_vpn.max(map_area.vpn_range.get_end());
+                // 插入映射，并拷贝数据，初始化数据区为 0
                 memory_set.push(
                     map_area,
                     Some(&elf.input[ph.offset() as usize..(ph.offset() + ph.file_size()) as usize]),
@@ -244,11 +270,18 @@ impl<T: PageTable> MemorySet<T> {
             }
         }
         let max_end_va: VirtAddr = max_end_vpn.into();
-        let mut user_stack_base: usize = max_end_va.into();
+        let heap_start = align_up(max_end_va.into(), PAGE_SIZE);
+
+        info!("heap_start:  {:#x}\n", heap_start);
+        memory_set.heap_start = heap_start;
+        memory_set.brk = heap_start;
+        let mut user_stack_base: usize = UserStackBase;
         user_stack_base += PAGE_SIZE;
+
+        //用户栈顶的位置为 TRAP_CONTEXT_BASE
+        let user_stack_top = TRAP_CONTEXT_BASE;
         (
             memory_set,
-            user_stack_base,
             elf.header.pt2.entry_point() as usize,
         )
     }

@@ -134,6 +134,10 @@ pub fn chdir(path: &str) -> isize {
     sys_chdir(path)
 }
 
+pub fn brk(addr: usize) -> isize {
+    sys_brk(addr)
+}
+
 /// Action for a signal
 #[repr(C, align(16))]
 #[derive(Debug, Clone, Copy)]

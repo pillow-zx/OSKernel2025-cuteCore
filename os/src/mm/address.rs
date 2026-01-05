@@ -320,3 +320,8 @@ where
 
 /// 虚拟页号范围类型别名
 pub type VPNRange = SimpleRange<VirtPageNum>;
+
+#[inline]
+pub fn align_up(addr: usize, align: usize) -> usize {
+    (addr + align - 1) & !(align - 1)
+}

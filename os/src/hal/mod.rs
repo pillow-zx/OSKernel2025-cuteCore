@@ -42,6 +42,7 @@ pub use arch::{
     TRAMPOLINE,        // 跳板页地址（用于用户态/内核态转换代码的映射）
     TRAP_CONTEXT_BASE, // 中断上下文在虚拟地址空间中的基地址
     USER_STACK_SIZE,   // 用户栈大小
+    UserStackBase,     // 用户栈基地址
 };
 
 // --- 控制台与系统操作 ---

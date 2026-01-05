@@ -38,3 +38,4 @@ pub const MEMORY_END: usize = 0x8800_0000; // 约 2.2 GB
 /// 内存块大小，512 字节
 /// 常用于文件系统或磁盘块管理
 pub const BLOCK_SZ: usize = 512;
+pub const UserStackBase: usize = TRAP_CONTEXT_BASE - 8 * (PAGE_SIZE + USER_STACK_SIZE);

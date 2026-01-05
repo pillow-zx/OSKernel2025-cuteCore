@@ -15,8 +15,13 @@ pub const PAGE_SIZE: usize = 0x1000; // 4 * 1024 = 4096 bytes
 /// 例如，页对齐地址可以用 addr >> PAGE_SIZE_BITS
 pub const PAGE_SIZE_BITS: usize = 0xc; // 12，即 2^12 = 4096 bytes
 
+//todo 看一下这个原先UER_STACK_SIZE原先设为8MB是不是预期的
+//todo 我需要这个字段去给每一个线程分配用户栈，8MB是不是太大了？
+//todo 我加了一个USER_STACK_Totol_SIZE字段，表示用户栈的总大小。是否是预期总大小为8MB?
 /// 用户栈最大大小：8 MB
-pub const USER_STACK_SIZE: usize = 8 * 0x1000 * 0x1000; // 8 MB
+pub const USER_STACK_Totol_SIZE: usize = 8 * 0x1000 * 0x1000; // 8 MB
+/// 每一个用户栈大小，2 页，总共 8KB
+pub const USER_STACK_SIZE: usize = PAGE_SIZE * 2; // 8 KB
 
 /// 内核栈大小，16 MB
 pub const KERNEL_STACK_SIZE: usize = 16 * 0x1000 * 0x1000; // 16 MB
@@ -35,7 +40,12 @@ pub const VA_MASK: usize = (1 << VA_BITS) - 1; // Mask for 39-bit virtual addres
 
 /// 虚拟地址空间大小，512 GB
 pub const VA_SPACE_SIZE: usize = 1 << VA_BITS; // 512 GB virtual address space
-
+/// Trampoline 位于虚拟地址空间的顶端 - 4KB
+pub const TRAMPOLINE: usize = VA_SPACE_SIZE - PAGE_SIZE + 1;
+/// Trap Context 的基地址
+pub const TRAP_CONTEXT_BASE: usize = TRAMPOLINE - PAGE_SIZE;
+/// 用户栈的基地址，根据预留的大小计算得出
+pub const UserStackBase: usize = TRAP_CONTEXT_BASE - USER_STACK_Totol_SIZE;
 // /// ========================
 // /// 内存与系统资源相关常量
 // /// ========================
