@@ -1,6 +1,9 @@
-use crate::fs::{open_dir, open_file, resolve_path, OpenFlags};
-use crate::mm::{translated_byte_buffer, translated_str, UserBuffer};
-use crate::task::{current_process, current_user_token};
+use alloc::sync::Arc;
+use core::clone;
+use log::info;
+use crate::fs::{open_dir, open_file, resolve_path, OpenFlags,UserStat};
+use crate::mm::{translated_byte_buffer, translated_str, UserBuffer,copy_to_user};
+use crate::task::{current_process, current_task, current_user_token};
 
 // 已实现
 // pub fn sys_getcwd(buf: *const u8, len: usize) -> *const u8 {
@@ -30,7 +33,7 @@ pub fn sys_getcwd(buf: *const u8, len: usize) -> isize {
     buf as isize
 }
 
-// 已实现
+// cwd_inode更新逻辑，如果能打不开文件就崩溃，初始化为根目录
 pub fn sys_chdir(path: *const u8) -> isize {
     let process = current_process();
     let token = current_user_token();
@@ -43,6 +46,10 @@ pub fn sys_chdir(path: *const u8) -> isize {
     let process = current_process();
     let mut inner = process.inner_exclusive_access();
     inner.cwd = resolve_path(path.as_str(), inner.cwd.as_str());
+    inner.cwd_inode = match open_dir(inner.cwd.as_str()) {
+        Ok(Inode) => Inode,
+        Err(_) => panic!("open_dir failed"),
+    };
     0
 }
 
@@ -74,6 +81,7 @@ pub fn sys_write(fd: usize, buf: *const u8, len: usize) -> isize {
         return -1;
     }
     if let Some(file) = &inner.fd_table[fd] {
+
         if !file.writable() {
             return -1;
         }
@@ -99,29 +107,11 @@ pub fn sys_close(fd: usize) -> isize {
     0
 }
 
-pub fn sys_open(path: *const u8, flags: u32) -> isize {
-    let process = current_process();
-    let token = current_user_token();
-    let path = translated_str(token, path);
-    if let Some(inode) = open_file(path.as_str(), OpenFlags::from_bits(flags).unwrap()) {
-        let mut inner = process.inner_exclusive_access();
-        let fd = inner.alloc_fd();
-        inner.fd_table[fd] = Some(inode);
-        fd as isize
-    } else {
-        -1
-    }
-}
-// 目前文件可能会因为输入none而发生panic,下面这个版本可以不发生pinic继续执行
 // pub fn sys_open(path: *const u8, flags: u32) -> isize {
 //     let process = current_process();
 //     let token = current_user_token();
 //     let path = translated_str(token, path);
-//     let flags = match OpenFlags::from_bits(flags) {
-//         Some(f) => f,
-//         None => return -1,
-//     };
-//     if let Some(inode) = open_file(path.as_str(), flags) {
+//     if let Some(inode) = open_file(path.as_str(), OpenFlags::from_bits(flags).unwrap()) {
 //         let mut inner = process.inner_exclusive_access();
 //         let fd = inner.alloc_fd();
 //         inner.fd_table[fd] = Some(inode);
@@ -130,3 +120,46 @@ pub fn sys_open(path: *const u8, flags: u32) -> isize {
 //         -1
 //     }
 // }
+// 目前文件可能会因为输入none而发生panic,下面这个版本可以不发生pinic继续执行
+pub fn sys_open(path: *const u8, flags: u32) -> isize {
+    let process = current_process();
+    let token = current_user_token();
+    let path = translated_str(token, path);
+    let flags = match OpenFlags::from_bits(flags) {
+        Some(f) => f,
+        None => return -1,
+    };
+    if let Some(inode) = open_file(path.as_str(), flags) {
+        let mut inner = process.inner_exclusive_access();
+        let fd = inner.alloc_fd();
+        inner.fd_table[fd] = Some(inode);
+        fd as isize
+    } else {
+        -1
+    }
+}
+
+pub fn sys_fstat(fd:usize,statbuf:*mut u8) -> isize{
+    let task = current_task().unwrap();
+    let proc = current_process();
+    let token = current_user_token();
+    info!("[sys_fstat] fd:{}",fd);
+
+    let Inode = match fd {
+        AT_FDCWD=> proc.inner_exclusive_access().cwd_inode.clone(),
+        fd => {
+            let fd_table = &proc.inner_exclusive_access().fd_table;
+            match &fd_table[fd] {
+                Some(OSInote) => OSInote.clone(),
+                None => return -1,
+            }
+        }
+    };
+    if copy_to_user(token,&Inode.get_stat(),statbuf as *mut UserStat).is_err() {
+        log::error!("[sys_fstat] Failed to copy to {:?}", statbuf);
+        return -1;
+    }
+    0
+}
+
+

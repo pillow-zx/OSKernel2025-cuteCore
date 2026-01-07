@@ -17,5 +17,5 @@ pub use address::{PhysAddr, PhysPageNum, StepByOne, VirtAddr, VirtPageNum};
 pub use frame_allocator::{frame_alloc, frame_alloc_more, frame_dealloc, FrameTracker};
 pub use pagetable::{
     translated_byte_buffer, translated_ref, translated_refmut, translated_str, PageTable,
-    UserBuffer,
+    UserBuffer,copy_to_user,
 };

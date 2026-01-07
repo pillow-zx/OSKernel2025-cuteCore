@@ -13,6 +13,7 @@ const SYSCALL_WAITPID: usize = 260;
 const SYSCALL_GETCWD: usize = 17;
 const SYSCALL_GETPID: usize = 172;
 const SYSCALL_CHDIR: usize = 49;
+const SYSCALL_FSTAT: usize = 80;
 
 mod fs;
 mod process;
@@ -35,6 +36,7 @@ pub fn syscall(syscall_id: usize, args: [usize; 6]) -> isize {
         SYSCALL_YIELD => sys_yield(),
         SYSCALL_BRK => sys_brk(args[0]),
         SYSCALL_MUNMAP => sys_munmap(args[0],args[1]),
+        SYSCALL_FSTAT => sys_fstat(args[0],args[1] as *mut u8),
         SYSCALL_FORK => sys_fork(),
         SYSCALL_MMAP => sys_mmap(args[0], args[1], args[2], args[3], args[4] as isize, args[5]),
         SYSCALL_EXEC => sys_exec(args[0] as *const u8, args[1] as *const usize),

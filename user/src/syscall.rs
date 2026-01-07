@@ -6,6 +6,7 @@ const SYSCALL_CLOSE: usize = 57;
 const SYSCALL_PIPE: usize = 59;
 const SYSCALL_READ: usize = 63;
 const SYSCALL_WRITE: usize = 64;
+const SYSCALL_FSTAT: usize = 80;
 const SYSCALL_EXIT: usize = 93;
 const SYSCALL_YIELD: usize = 124;
 const SYSCALL_KILL: usize = 129;
@@ -113,4 +114,8 @@ pub fn sys_brk(addr:usize) -> isize {
 
 pub fn sys_munmap(start:usize, len:usize) -> isize {
     syscall(SYSCALL_MUNMAP, [start, len, 0, 0, 0, 0])
+}
+
+pub fn sys_fstat(fd:usize,statbuff:*mut u8) -> isize {
+    syscall(SYSCALL_FSTAT, [fd, statbuff as usize,  0, 0, 0, 0])
 }

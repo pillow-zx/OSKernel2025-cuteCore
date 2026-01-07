@@ -37,8 +37,8 @@
 //!   - 分配 / 回收 TID
 //! - TCB 与 TID 的生命周期严格绑定
 
-use crate::hal::{kstack_alloc, trap_cx_bottom_from_tid, ustack_bottom_from_tid, KernelStack, TrapContext, UserStackBase, PAGE_SIZE, USER_STACK_SIZE};
-use crate::mm::{MapPermission, PhysPageNum, VirtAddr};
+use crate::hal::{kstack_alloc, trap_cx_bottom_from_tid, ustack_bottom_from_tid, KernelStack, PageTableImpl, TrapContext, UserStackBase, PAGE_SIZE, USER_STACK_SIZE};
+use crate::mm::{MapPermission, MemorySet, PageTable, PhysPageNum, VirtAddr};
 use crate::sync::{UPIntrFreeCell, UPIntrRefMut};
 use crate::task::context::TaskContext;
 use crate::task::process::ProcessControlBlock;

@@ -47,7 +47,7 @@
 //!   - 管理文件描述符和线程 ID 分配
 //! - 任务访问：通过 `get_task(tid)` 获取特定线程
 
-use crate::fs::{File, Stdin, Stdout};
+use crate::fs::{File, Stdin, Stdout,current_root_inode};
 use crate::hal::{trap_handler, PageTableImpl, TrapContext, UserStackBase};
 use crate::mm::{translated_refmut, MemorySet, KERNEL_SPACE};
 use crate::sync::{Condvar, Mutex, Semaphore, UPIntrFreeCell, UPIntrRefMut};
@@ -79,6 +79,8 @@ pub struct ProcessControlBlockInner {
     pub children: Vec<Arc<ProcessControlBlock>>,
     pub exit_code: i32,
     pub cwd: String,
+    //由于fat32每次打开都会开一个新inode，所以需要记录当前的inode是什么
+    pub cwd_inode:Arc<dyn File + Send + Sync>,
     pub fd_table: Vec<Option<Arc<dyn File + Send + Sync>>>,
     pub signals: SignalFlags,
     pub tasks: Vec<Option<Arc<TaskControlBlock>>>,
@@ -106,6 +108,7 @@ impl ProcessControlBlock {
         let (memory_set, entry_point) = MemorySet::from_elf(elf_data);
         // allocate a pid
         let pid_handle = pid_alloc();
+        let Root_Ionde = current_root_inode();
         let process = Arc::new(Self {
             pid: pid_handle,
             inner: unsafe {
@@ -115,6 +118,7 @@ impl ProcessControlBlock {
                     parent: None,
                     children: Vec::new(),
                     exit_code: 0,
+                    cwd_inode: Root_Ionde,
                     cwd: "/".to_string(),
                     fd_table: vec![
                         // 0 -> stdin
@@ -252,6 +256,7 @@ impl ProcessControlBlock {
                     parent: Some(Arc::downgrade(self)),
                     children: Vec::new(),
                     exit_code: 0,
+                    cwd_inode:parent.cwd_inode.clone(),
                     cwd: parent.cwd.clone(),
                     fd_table: new_fd_table,
                     signals: SignalFlags::empty(),
