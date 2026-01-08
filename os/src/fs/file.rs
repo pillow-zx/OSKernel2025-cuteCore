@@ -7,6 +7,12 @@ pub trait File: Send + Sync {
     fn read(&self, buf: UserBuffer) -> usize;
     fn write(&self, buf: UserBuffer) -> usize;
     fn get_stat(&self) -> UserStat;
+    /// 读取文件内容到 buf 中，从文件 offset 开始
+    /// 返回实际读取的字节数
+    fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize, isize>;
+    /// 写文件
+    fn write_at(&self, offset: usize, buf: &[u8]) -> Result<usize, isize>;
+
 }
 
 pub const S_IFREG: u32 = 0o100000; //普通文件

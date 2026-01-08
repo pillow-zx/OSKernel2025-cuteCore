@@ -12,6 +12,7 @@ use core::cell::UnsafeCell;
 use bitflags::bitflags;
 use fatfs::{DefaultTimeProvider, Dir, File, FileSystem, LossyOemCpConverter, Read, Seek, SeekFrom, Write};
 use lazy_static::lazy_static;
+use log::Log;
 use crate::fs::file::{BLK_SIZE, Stat, S_IFDIR, S_IFREG, UserStat};
 
 pub const AT_FDCWD:usize = 100usize.wrapping_neg();
@@ -197,9 +198,48 @@ impl super::File for OSInode {
                 }
             }
         }
-
         self.Stat.update_after_write(total_write_size);
+        drop(self.file.exclusive_access());
         total_write_size
+    }
+    /// 从 offset 读取文件内容
+    fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize, isize> {
+        // 获取内部可变访问权限
+        let mut inner = self.file.exclusive_access();
+        match &mut *inner {
+            FatType::File(file) => {
+                // fatfs::File 需要 &mut 来读写
+                let mut file_ref = file; // File 类型本身可能在 UPIntrFreeCell 内部
+
+                // seek 到 offset
+                file_ref.seek(SeekFrom::Start(offset as u64)).map_err(|_| -1isize)?;
+                // 读取数据
+                let n = file_ref.read(buf).map_err(|_| -1isize)?;
+                Ok(n)
+            }
+            FatType::Dir(_) => Err(-1),
+        }
+    }
+
+    fn write_at(&self, offset: usize, buf: &[u8]) -> Result<usize, isize> {
+        let mut inner = self.file.exclusive_access();
+        match &mut *inner {
+            FatType::File(file) => {
+                let mut file_ref = file;
+                // seek 到 offset
+                file_ref.seek(SeekFrom::Start(offset as u64)).map_err(|_| -1isize)?;
+                // 写入数据
+                let n = file_ref.write(buf).map_err(|_| -1isize)?;
+
+                // 更新 Stat
+                let file_size = file_ref.seek(SeekFrom::End(0)).map_err(|_| -1isize)? as i64;
+                unsafe { *self.Stat.st_size.get() = file_size; }
+                unsafe { *self.Stat.st_blocks.get() = ((file_size as usize + 511) / 512) as u64; }
+                drop(self.file.exclusive_access());
+                Ok(n)
+            }
+            FatType::Dir(_) => Err(-1),
+        }
     }
          fn get_stat(&self) -> UserStat {
         unsafe {
@@ -217,6 +257,7 @@ impl super::File for OSInode {
             }
         }
     }
+
 }
 
 impl Stat {

@@ -12,7 +12,7 @@ pub fn init() {
     KERNEL_SPACE.exclusive_access().activate();
 }
 
-pub use crate::mm::memory_set::{kernel_token, MapPermission, MemorySet, KERNEL_SPACE};
+pub use crate::mm::memory_set::{kernel_token, MapPermission, MemorySet, KERNEL_SPACE,MapFlags};
 pub use address::{PhysAddr, PhysPageNum, StepByOne, VirtAddr, VirtPageNum};
 pub use frame_allocator::{frame_alloc, frame_alloc_more, frame_dealloc, FrameTracker};
 pub use pagetable::{

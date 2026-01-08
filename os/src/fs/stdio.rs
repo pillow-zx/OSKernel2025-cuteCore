@@ -35,6 +35,12 @@ impl File for Stdin {
     fn get_stat(&self) -> UserStat {
         todo!()
     }
+    fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize, isize> {
+        todo!()
+    }
+    fn write_at(&self, offset: usize, buf: &[u8]) -> Result<usize, isize> {
+        todo!()
+    }
 }
 
 impl File for Stdout {
@@ -55,6 +61,12 @@ impl File for Stdout {
     }
 
     fn get_stat(&self) -> UserStat {
+        todo!()
+    }
+    fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize, isize> {
+        todo!()
+    }
+    fn write_at(&self, offset: usize, buf: &[u8]) -> Result<usize, isize> {
         todo!()
     }
 }

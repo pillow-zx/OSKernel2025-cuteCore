@@ -151,6 +151,9 @@ impl VirtAddr {
     pub fn aligned(&self) -> bool {
         self.page_offset() == 0
     }
+    pub fn into_usize(self) -> usize {
+        self.0
+    }
 }
 impl From<VirtAddr> for VirtPageNum {
     fn from(v: VirtAddr) -> Self {
