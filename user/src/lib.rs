@@ -61,11 +61,17 @@ fn main(_argc: usize, _argv: &[&str]) -> i32 {
 
 bitflags! {
     pub struct OpenFlags: u32 {
+        // 只读
         const RDONLY = 0;
+        // 只写
         const WRONLY = 1 << 0;
+        // 读写
         const RDWR = 1 << 1;
-        const CREATE = 1 << 9;
+        // 创建
+        const CREATE = 1 << 6;
+        // 截断（若存在则以可写方式打开，但是长度清空为0）
         const TRUNC = 1 << 10;
+        const DIRECTORY = 1 << 17; // 目录（O_DIRECTORY = 0x0200000）
     }
 }
 

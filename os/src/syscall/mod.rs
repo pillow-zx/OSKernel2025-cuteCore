@@ -25,6 +25,8 @@ use process::*;
 
 pub fn syscall(syscall_id: usize, args: [usize; 6]) -> isize {
     match syscall_id {
+        //目前版本的open与测试文件参数不同，需要调整成1 , 2才可以跑
+        //todo 完善open_at
         SYSCALL_OPEN => sys_open(args[0] as *const u8, args[1] as u32),
         SYSCALL_CLOSE => sys_close(args[0]),
         SYSCALL_READ => sys_read(args[0], args[1] as *const u8, args[2]),

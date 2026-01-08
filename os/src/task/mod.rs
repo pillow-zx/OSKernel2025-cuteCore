@@ -62,7 +62,7 @@ pub use processor::{
 use crate::fs::{open_initproc, OpenFlags};
 use crate::hal::shutdown;
 use crate::task::pid::IDLE_PID;
-use crate::task::process::ProcessControlBlock;
+pub use crate::task::process::{ProcessControlBlock,ProcessControlBlockInner};
 use crate::task::task::TaskUserRes;
 pub use signal::SignalFlags;
 pub use task::{TaskControlBlock, TaskStatus};

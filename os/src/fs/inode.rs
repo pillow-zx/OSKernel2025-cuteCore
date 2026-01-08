@@ -41,7 +41,7 @@ unsafe impl Sync for OSInode {}
 
 impl OSInode {
     pub fn new(readable: bool, writable: bool, file: FatType, is_dir:bool) -> Self {
-        let mut st_mode = if is_dir { 0o040000 } else { 0o100000 }; // S_IFDIR / S_IFREG
+        let mut st_mode = if is_dir { 0x040000 } else { 0x100000 }; // S_IFDIR / S_IFREG
         if readable { st_mode |= 0o444 } // r--
         if writable { st_mode |= 0o222 } // -w-
 
@@ -126,6 +126,7 @@ pub fn list_apps() {
 }
 
 bitflags! {
+    #[derive(Debug)]
     pub struct OpenFlags: u32 {
         // 只读
         const RDONLY = 0;
@@ -134,9 +135,10 @@ bitflags! {
         // 读写
         const RDWR = 1 << 1;
         // 创建
-        const CREATE = 1 << 9;
+        const CREATE = 1 << 6;
         // 截断（若存在则以可写方式打开，但是长度清空为0）
         const TRUNC = 1 << 10;
+        const DIRECTORY = 1 << 17; // 目录（O_DIRECTORY = 0x0200000）
     }
 }
 
@@ -199,9 +201,25 @@ impl super::File for OSInode {
             }
         }
         self.Stat.update_after_write(total_write_size);
-        drop(self.file.exclusive_access());
         total_write_size
     }
+    fn get_stat(&self) -> UserStat {
+   unsafe {
+       UserStat {
+           st_dev: self.Stat.st_dev,
+           st_ino: self.Stat.st_ino,
+           st_mode: self.Stat.st_mode,
+           st_nlink: self.Stat.st_nlink,
+           st_uid: self.Stat.st_uid,
+           st_gid: self.Stat.st_gid,
+           st_rdev: self.Stat.st_rdev,
+           st_size: *self.Stat.st_size.get(),
+           st_blksize: self.Stat.st_blksize,
+           st_blocks: *self.Stat.st_blocks.get(),
+       }
+   }
+}
+
     /// 从 offset 读取文件内容
     fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize, isize> {
         // 获取内部可变访问权限
@@ -220,7 +238,6 @@ impl super::File for OSInode {
             FatType::Dir(_) => Err(-1),
         }
     }
-
     fn write_at(&self, offset: usize, buf: &[u8]) -> Result<usize, isize> {
         let mut inner = self.file.exclusive_access();
         match &mut *inner {
@@ -239,22 +256,6 @@ impl super::File for OSInode {
                 Ok(n)
             }
             FatType::Dir(_) => Err(-1),
-        }
-    }
-         fn get_stat(&self) -> UserStat {
-        unsafe {
-            UserStat {
-                st_dev: self.Stat.st_dev,
-                st_ino: self.Stat.st_ino,
-                st_mode: self.Stat.st_mode,
-                st_nlink: self.Stat.st_nlink,
-                st_uid: self.Stat.st_uid,
-                st_gid: self.Stat.st_gid,
-                st_rdev: self.Stat.st_rdev,
-                st_size: *self.Stat.st_size.get(),
-                st_blksize: self.Stat.st_blksize,
-                st_blocks: *self.Stat.st_blocks.get(),
-            }
         }
     }
 

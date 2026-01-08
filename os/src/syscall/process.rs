@@ -10,6 +10,7 @@ use crate::timer::get_time_ms;
 use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
+use log::info;
 
 pub fn sys_exit(exit_code: i32) -> ! {
     exit_current_and_run_next(exit_code);
@@ -69,11 +70,19 @@ pub fn sys_mmap(
     fd: isize,
     off: usize,
 ) -> isize {
+    println!("[sys_mmap]len:{}",len);
     let process = current_process();
     let mut inner = process.inner_exclusive_access();
-
+    let file = if fd >= 0 {
+        inner.fd_table
+            .get(fd as usize)
+            .and_then(|f| f.as_ref())
+            .cloned()
+    } else {
+        None
+    };
     // 调用 MemorySet::mmap
-    match inner.memory_set.mmap(start, len, prot, flags, fd, off) {
+    match inner.memory_set.mmap(start, len, prot, flags, file , off) {
         Ok(addr) => addr as isize, // 返回映射起始虚拟地址
         Err(e) => e,               // 返回 -1
     }
