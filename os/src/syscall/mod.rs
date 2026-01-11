@@ -1,4 +1,5 @@
 const SYSCALL_GETCWD: usize = 17;
+const SYSCALL_MKDIRAT: usize = 34;
 const SYSCALL_CHDIR: usize = 49;
 const SYSCALL_OPENAT: usize = 56;
 const SYSCALL_CLOSE: usize = 57;
@@ -47,6 +48,7 @@ pub fn syscall(syscall_id: usize, args: [usize; 6]) -> isize {
         SYSCALL_READ => sys_read(args[0], args[1] as *const u8, args[2]),
         SYSCALL_WRITE => sys_write(args[0], args[1] as *const u8, args[2]),
         SYSCALL_GETCWD => sys_getcwd(args[0] as *const u8, args[1]),
+        SYSCALL_MKDIRAT => sys_mkdirat(args[0] as isize,args[1] as *const u8,args[2] as u32),
         SYSCALL_CHDIR => sys_chdir(args[0] as *const u8),
         SYSCALL_GETPID => sys_getpid(),
         SYSCALL_EXIT => sys_exit(args[0] as i32),

@@ -1,6 +1,7 @@
 use core::arch::asm;
 
 const SYSCALL_DUP: usize = 24;
+const SYSCALL_MKDIRAT: usize = 34;
 const SYSCALL_OPEN: usize = 56;
 const SYSCALL_CLOSE: usize = 57;
 const SYSCALL_PIPE: usize = 59;
@@ -116,6 +117,10 @@ pub fn sys_munmap(start:usize, len:usize) -> isize {
     syscall(SYSCALL_MUNMAP, [start, len, 0, 0, 0, 0])
 }
 
-pub fn sys_fstat(fd:usize,statbuff:*mut u8) -> isize {
+pub fn sys_fstat(fd: usize, statbuff: *mut u8) -> isize {
     syscall(SYSCALL_FSTAT, [fd, statbuff as usize,  0, 0, 0, 0])
+}
+
+pub fn sys_mkdirat(dirfd: isize,path: *const u8,mode: u8) -> isize {
+    syscall(SYSCALL_MKDIRAT, [dirfd as usize, path as usize, mode as usize, 0, 0, 0])
 }

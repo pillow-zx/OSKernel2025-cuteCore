@@ -15,7 +15,6 @@ use fatfs::{
 };
 use lazy_static::lazy_static;
 
-pub const AT_FDCWD: usize = 100usize.wrapping_neg();
 pub struct OSInode {
     readable: bool,
     writable: bool,
@@ -436,35 +435,54 @@ pub fn open_file_at(
 }
 
 ///创建目录，如果存在就返回err(-1)
-/// 后续需要完善没有父节点的情况
 pub fn create_dir(path: &str) -> Result<Arc<OSInode>, isize> {
+    // 1. 解析完整路径（基于 cwd）
     let full_path = {
         let proc = current_process();
         let inner = proc.inner_exclusive_access();
         resolve_path(path, &inner.cwd)
     };
 
+    // 去掉前导 '/'
     let path_in_fs = full_path.strip_prefix("/").unwrap_or(&full_path);
+
+    // 2. 拆分 parent 和 dir name
+    let (parent_path, dir_name) = match path_in_fs.rsplit_once('/') {
+        Some((p, n)) => (p, n),
+        None => ("", path_in_fs), // 位于根目录
+    };
+
+    if dir_name.is_empty() {
+        return Err(-1);
+    }
+
     let root_dir = ROOT_DIR.exclusive_access();
 
-    // 如果已经存在，直接报错
-    if root_dir.open_dir(path_in_fs).is_ok() {
+    // 3. 打开父目录
+    let mut parent_dir = if parent_path.is_empty() {
+        root_dir.clone()
+    } else {
+        root_dir.open_dir(parent_path).map_err(|_| -1isize)?
+    };
+
+    // 4. 如果已存在，报错
+    if parent_dir.open_dir(dir_name).is_ok() {
         return Err(-1); // EEXIST
     }
 
-    root_dir
-        .create_dir(path_in_fs)
-        .map(|dir| {
-            Arc::new(OSInode::new(
-                true,
-                false,
-                FatType::Dir(dir),
-                true,
-                full_path,
-            ))
-        })
-        .map_err(|_| -1)
+    // 5. 创建目录
+    let dir = parent_dir.create_dir(dir_name).map_err(|_| -1isize)?;
+
+    // 6. 封装成 OSInode
+    Ok(Arc::new(OSInode::new(
+        true,                  // readable（目录可读）
+        false,                 // writable（fatfs 不支持写目录内容）
+        FatType::Dir(dir),
+        true,                  // is_directory
+        full_path,
+    )))
 }
+
 
 /// 打开目录，返回 OSInode
 /// path 可以是绝对路径或相对路径

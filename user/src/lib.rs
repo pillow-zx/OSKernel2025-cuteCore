@@ -156,6 +156,9 @@ pub fn fstat(fd:usize,statbuff:*mut u8) -> isize {
     sys_fstat(fd,statbuff)
 }
 
+pub fn mkdir(dirfd:isize,path: *const u8,mode:u8) -> isize {
+    sys_mkdirat(dirfd,path,mode)
+}
 /// Action for a signal
 #[repr(C, align(16))]
 #[derive(Debug, Clone, Copy)]

@@ -1,9 +1,12 @@
+use alloc::string::{String, ToString};
 use crate::fs::{open_dir, open_file, open_file_at, resolve_path, File, OpenFlags, UserStat};
 use crate::mm::{copy_to_user, translated_byte_buffer, translated_str, UserBuffer};
 use crate::task::{current_process, current_task, current_user_token};
 use alloc::sync::Arc;
 use bitflags::bitflags;
+use embedded_hal::spi::Mode;
 use log::info;
+use crate::fs::inode::create_dir;
 
 pub const AT_FDCWD: usize = 100usize.wrapping_neg();
 
@@ -37,23 +40,69 @@ pub fn sys_getcwd(buf: *const u8, len: usize) -> isize {
 
 // cwd_inode更新逻辑，如果能打不开文件就崩溃，初始化为根目录
 pub fn sys_chdir(path: *const u8) -> isize {
-    let process = current_process();
     let token = current_user_token();
     let path = translated_str(token, path);
-    drop(process);
-    if open_dir(path.as_str()).is_err() {
-        println!("open_dir: {}", path);
-        return -1;
-    }
+
+    // -------- 1. 计算新的 cwd（不打开目录）--------
+    let new_cwd: String = {
+        let process = current_process();
+        let inner = process.inner_exclusive_access();
+        resolve_path(path.as_str(), inner.cwd.as_str())
+    }; // inner 在这里自动 drop
+
+    // -------- 2. 验证目录是否存在 --------
+    let inode = match open_dir(new_cwd.as_str()) {
+        Ok(inode) => inode,
+        Err(_) => return -1, // ENOENT / ENOTDIR
+    };
+
+    // -------- 3. 写回 PCB --------
     let process = current_process();
     let mut inner = process.inner_exclusive_access();
-    inner.cwd = resolve_path(path.as_str(), inner.cwd.as_str());
-    inner.cwd_inode = match open_dir(inner.cwd.as_str()) {
-        Ok(Inode) => Inode,
-        Err(_) => panic!("open_dir failed"),
-    };
+    inner.cwd = new_cwd;
+    inner.cwd_inode = inode;
+
     0
 }
+
+
+pub fn sys_mkdirat(dirfd: isize, path: *const u8, mode: u32) -> isize {
+    let token = current_user_token();
+    let path = translated_str(token, path);
+
+    let process = current_process();
+    let inner = process.inner_exclusive_access();
+
+    // ---------- 1. 确定 base path ----------
+    let base_path = if path.starts_with("/") {
+        "/".to_string()
+    } else if dirfd == AT_FDCWD as isize {
+        inner.cwd.clone()
+    } else {
+        // dirfd 必须是合法 fd
+        let fd = match inner.fd_table.get(dirfd as usize) {
+            Some(Some(inode)) => inode.clone(),
+            _ => return -1, // EBADF
+        };
+
+        // dirfd 必须指向目录
+        if !fd.is_dir() {
+            return -1; // ENOTDIR
+        }
+
+        fd.get_path()
+    };
+    drop(inner);
+    // 2. 拼接最终路径
+    let full_path = resolve_path(&path, &base_path);
+
+    // 3. 创建目录
+    match create_dir(&full_path) {
+        Ok(_) => 0,
+        Err(_) => -1,
+    }
+}
+
 
 pub fn sys_read(fd: usize, buf: *const u8, len: usize) -> isize {
     let token = current_user_token();
