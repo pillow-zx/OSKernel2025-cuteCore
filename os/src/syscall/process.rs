@@ -1,14 +1,21 @@
 #![allow(unused)]
 
 use crate::fs::{open_file, OpenFlags};
-use crate::mm::{copy_to_user, get_from_user, translated_byte_buffer, translated_ref, translated_refmut, translated_str, UserBuffer};
-use crate::task::{block_current_and_run_next, current_process, current_task, current_user_token, exit_current_and_run_next, find_task_by_pid, pid2process, suspend_current_and_run_next, wake_blocked, Rusage, SignalFlags, TaskStatus};
+use crate::mm::{
+    copy_to_user, get_from_user, translated_byte_buffer, translated_ref, translated_refmut,
+    translated_str, UserBuffer,
+};
+use crate::task::{
+    block_current_and_run_next, current_process, current_task, current_user_token,
+    exit_current_and_run_next, find_task_by_pid, pid2process, suspend_current_and_run_next,
+    wake_blocked, Rusage, SignalFlags, TaskStatus,
+};
 use crate::timer::{add_timer, get_time_ms, TimeSpec, TimeVal, TimeZone, Tms};
 use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
-use core::mem::size_of;
 use bitflags::bitflags;
+use core::mem::size_of;
 
 pub fn sys_exit(exit_code: i32) -> ! {
     exit_current_and_run_next((exit_code & 0xff) << 8);
@@ -70,7 +77,8 @@ pub fn sys_mmap(
     let process = current_process();
     let mut inner = process.inner_exclusive_access();
     let file = if fd >= 0 {
-        inner.fd_table
+        inner
+            .fd_table
             .get(fd as usize)
             .and_then(|f| f.as_ref())
             .cloned()
@@ -78,13 +86,11 @@ pub fn sys_mmap(
         None
     };
     // 调用 MemorySet::mmap
-    match inner.memory_set.mmap(start, len, prot, flags, file , off) {
+    match inner.memory_set.mmap(start, len, prot, flags, file, off) {
         Ok(addr) => addr as isize, // 返回映射起始虚拟地址
         Err(e) => e,               // 返回 -1
     }
 }
-
-
 
 // pub fn sys_fork() -> isize {
 //     let current_process = current_process();
@@ -99,15 +105,21 @@ pub fn sys_mmap(
 //     trap_cx.general_regs.a0 = 0;
 //     new_pid as isize
 // }
-pub fn sys_clone(flags: u32, stack: *const u8, ptid: *mut u32, tls: usize, ctid: *mut u32,) -> isize {
+pub fn sys_clone(
+    flags: u32,
+    stack: *const u8,
+    ptid: *mut u32,
+    tls: usize,
+    ctid: *mut u32,
+) -> isize {
     let parent_task = current_task().unwrap();
     let parent_token = parent_task.get_user_token();
     let parent = parent_task.process.upgrade().unwrap();
     // let parent_inner = parent.inner_exclusive_access();
     // 只取低八位，防止误解
-    let copy_flags =CloneFlags::from_bits_truncate(flags & !0xff) ;
+    let copy_flags = CloneFlags::from_bits_truncate(flags & !0xff);
     let exit_signal = SignalFlags::from_bits_truncate(flags & 0xff);
-    let flags =  CloneFlags::from_bits(flags & !0xff).unwrap();
+    let flags = CloneFlags::from_bits(flags & !0xff).unwrap();
     let child = parent.sys_clone(flags, stack, tls, exit_signal);
     let child_pid = child.pid.0;
     if copy_flags.contains(CloneFlags::CLONE_PARENT_SETTID) {
@@ -127,7 +139,6 @@ pub fn sys_clone(flags: u32, stack: *const u8, ptid: *mut u32, tls: usize, ctid:
     trap_cx.general_regs.a0 = 0;
     // print!("child: {}", trap_cx.general_regs.a0) ;
     child_pid as isize
-
 }
 // pub fn sys_exec(path: *const u8, mut args: *const usize) -> isize {
 //     let token = current_user_token();
@@ -154,7 +165,11 @@ pub fn sys_clone(flags: u32, stack: *const u8, ptid: *mut u32, tls: usize, ctid:
 //         -1
 //     }
 // }
-pub fn sys_execve(path: *const u8, mut argv: *const *const u8, mut envp: *const *const u8,) -> isize {
+pub fn sys_execve(
+    path: *const u8,
+    mut argv: *const *const u8,
+    mut envp: *const *const u8,
+) -> isize {
     let token = current_user_token();
     let path = translated_str(token, path);
     let mut argv_vec: Vec<String> = Vec::new();
@@ -239,7 +254,7 @@ bitflags! {
         const WNOWAIT    = 0x1000000;
     }
 }
-pub fn sys_wait4(pid: isize, status: *mut u32, option: u32, _ru: *mut Rusage) -> isize  {
+pub fn sys_wait4(pid: isize, status: *mut u32, option: u32, _ru: *mut Rusage) -> isize {
     let option = WaitOption::from_bits(option).unwrap();
     let task = current_task().unwrap();
     let token = current_user_token();
@@ -271,11 +286,11 @@ pub fn sys_wait4(pid: isize, status: *mut u32, option: u32, _ru: *mut Rusage) ->
                 // ++++ temporarily hold child lock
                 let exit_code = child_inner.exit_code;
                 if !status.is_null() {
-                    *translated_refmut(token, status) = exit_code as u32 ;
+                    *translated_refmut(token, status) = exit_code as u32;
                 }
                 return found_pid as isize;
             }
-        }else {
+        } else {
             drop(inner);
             if option.contains(WaitOption::WNOHANG) {
                 return 0;
@@ -288,7 +303,7 @@ pub fn sys_wait4(pid: isize, status: *mut u32, option: u32, _ru: *mut Rusage) ->
 
 pub fn sys_nanosleep(req: *const TimeSpec, rem: *mut TimeSpec) -> isize {
     if req.is_null() {
-        return  -1; // EINVAL;
+        return -1; // EINVAL;
     }
     let task = current_task().unwrap();
     let token = task.get_user_token();
@@ -334,7 +349,7 @@ pub fn sys_nanosleep(req: *const TimeSpec, rem: *mut TimeSpec) -> isize {
 pub fn sys_kill(pid: usize, sig: usize) -> isize {
     let signal = match SignalFlags::from_signum(sig) {
         Ok(signal) => signal,
-        Err(_) => return -1 //EINVAL,
+        Err(_) => return -1, //EINVAL,
     };
     if pid > 0 {
         // [Warning] in current implementation,
@@ -359,7 +374,7 @@ pub fn sys_kill(pid: usize, sig: usize) -> isize {
         }
     } else if pid == 0 {
         todo!()
-    }  else if (pid as isize) == -1 {
+    } else if (pid as isize) == -1 {
         todo!()
     } else {
         // (pid as isize) < -1
@@ -410,9 +425,11 @@ pub fn sys_times(tms_ptr: *mut Tms) -> isize {
 // TODO：根据实际修改,新增loongarch64之后需要分隔开
 pub fn sys_uname(utsname_ptr: *mut u8) -> isize {
     let token = current_user_token();
-    let mut buffer = UserBuffer::new(
-        translated_byte_buffer(token, utsname_ptr, size_of::<UTSName>())
-    );
+    let mut buffer = UserBuffer::new(translated_byte_buffer(
+        token,
+        utsname_ptr,
+        size_of::<UTSName>(),
+    ));
     const FIELD_OFFSET: usize = 65;
     buffer.write_buffer(Some(FIELD_OFFSET * 0), b"cutecore\0");
     buffer.write_buffer(Some(FIELD_OFFSET * 1), b"xeinnious\0");
@@ -436,10 +453,9 @@ pub fn sys_gettimeofday(tv: *mut TimeVal, _tz: *mut TimeZone) -> isize {
     let token = current_user_token();
     if !tv.is_null() {
         let time_val = &TimeVal::now();
-        println!("get copy_to_user");
-        if copy_to_user(token, time_val, tv ).is_err() {
+        if copy_to_user(token, time_val, tv).is_err() {
             log::error!("[sys_gettimeofday] Failed to copy to {:?}", tv);
-            return  -1 ;// EFAULT;
+            return -1; // EFAULT;
         }
     }
     0 // SUCCESS

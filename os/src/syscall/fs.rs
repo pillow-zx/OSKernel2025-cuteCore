@@ -1,12 +1,13 @@
-use alloc::string::{String, ToString};
-use crate::fs::{open_dir, open_file, open_file_at, resolve_path, File, OpenFlags, UserStat};
+use crate::fs::inode::{create_dir, OSInode};
+use crate::fs::{
+    open_dir, open_file, open_file_at, resolve_path, File, LinuxDirent64, OpenFlags, UserStat,
+};
 use crate::mm::{copy_to_user, translated_byte_buffer, translated_str, UserBuffer};
 use crate::task::{current_process, current_task, current_user_token};
+use alloc::string::{String, ToString};
 use alloc::sync::Arc;
 use bitflags::bitflags;
-use embedded_hal::spi::Mode;
 use log::info;
-use crate::fs::inode::{create_dir, OSInode};
 
 pub const AT_FDCWD: usize = 100usize.wrapping_neg();
 
@@ -65,7 +66,6 @@ pub fn sys_chdir(path: *const u8) -> isize {
     0
 }
 
-
 pub fn sys_mkdirat(dirfd: isize, path: *const u8, mode: u32) -> isize {
     let token = current_user_token();
     let path = translated_str(token, path);
@@ -99,7 +99,10 @@ pub fn sys_mkdirat(dirfd: isize, path: *const u8, mode: u32) -> isize {
     // 创建目录
     match create_dir(&full_path) {
         Ok(_) => 0,
-        Err(_) => -1,
+        Err(_) => {
+            println!("[sys_mkdirat]Failed to create directory: {},Maybe existed", &full_path);
+            -1
+        },
     }
 }
 ///复制文件描述符
@@ -174,7 +177,63 @@ pub fn sys_dup3(old_fd: usize, new_fd: usize, flags: usize) -> isize {
     new_fd as isize
 }
 
+pub fn sys_getdents64(fd: usize, buf: *mut u8, len: usize) -> isize {
+    let process = current_process();
+    let inner = process.inner_exclusive_access();
+    // fd 校验
+    if fd >= inner.fd_table.len() {
+        return -1;
+    }
+    let file = match inner.fd_table[fd].as_ref() {
+        Some(f) => f.clone(),
+        None => return -1,
+    };
+    // 必须是目录
+    if !file.is_dir() {
+        return -1;
+    }
+    // 至少能放下一个 dirent
+    if len < core::mem::size_of::<LinuxDirent64>() {
+        return -1;
+    }
+    drop(inner);
+    //  读取目录
+    let dir = file.as_any().downcast_ref::<OSInode>(); // Vec<String>
+    let dir_inode = match dir {
+        Some(dir) => dir,
+        None => return -1,
+    };
+    let entries = match dir_inode.list_dir() {
+        Ok(entries) => entries,
+        Err(_) => return -1,
+    };
 
+    if entries.is_empty() {
+        return 0;
+    }
+
+    let entry = &entries[0];
+    let name = entry.d_name.as_bytes();
+
+    let mut dirent = LinuxDirent64 {
+        d_ino: 1,
+        d_off: 0,
+        d_reclen: core::mem::size_of::<LinuxDirent64>() as u16,
+        d_type: 4,
+        d_name: [0; 256],
+    };
+
+    let copy_len = name.len().min(255);
+    dirent.d_name[..copy_len].copy_from_slice(&name[..copy_len]);
+
+    // 拷贝到用户态
+    let token = current_user_token();
+    if copy_to_user(token, &dirent, buf as *mut LinuxDirent64).is_err() {
+        log::error!("[sys_fstat] Failed to copy to {:?}", buf);
+        -1;
+    }
+    core::mem::size_of::<LinuxDirent64>() as isize
+}
 
 pub fn sys_read(fd: usize, buf: *const u8, len: usize) -> isize {
     let token = current_user_token();

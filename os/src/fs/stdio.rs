@@ -1,8 +1,9 @@
-use alloc::string::String;
 use super::File;
 use crate::fs::file::{Stat, UserStat};
 use crate::hal::console_getchar;
 use crate::mm::UserBuffer;
+use alloc::string::String;
+use core::any::Any;
 
 pub struct Stdin;
 pub struct Stdout;
@@ -52,6 +53,9 @@ impl File for Stdin {
     fn write_at(&self, offset: usize, buf: &[u8]) -> Result<usize, isize> {
         todo!()
     }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
 }
 
 impl File for Stdout {
@@ -89,5 +93,8 @@ impl File for Stdout {
 
     fn write_at(&self, offset: usize, buf: &[u8]) -> Result<usize, isize> {
         todo!()
+    }
+    fn as_any(&self) -> &dyn Any {
+        self
     }
 }

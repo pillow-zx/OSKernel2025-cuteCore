@@ -163,6 +163,11 @@ pub fn mkdir(dirfd:isize,path: *const u8,mode:u8) -> isize {
 pub fn dup3(old:isize, new:isize, flags:usize) -> isize {
     sys_dup3(old, new, flags)
 }
+
+pub fn getdents(fd:usize, buf:*mut u8, len:usize) -> isize {
+    sys_getdents(fd,buf, len)
+}
+
 #[repr(C, align(16))]
 #[derive(Debug, Clone, Copy)]
 pub struct SignalAction {

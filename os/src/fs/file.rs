@@ -1,6 +1,7 @@
 use crate::fs::inode::{FatType, OSInode};
 use crate::mm::UserBuffer;
 use alloc::string::String;
+use core::any::Any;
 use core::cell::UnsafeCell;
 use fatfs::SeekFrom;
 
@@ -17,6 +18,8 @@ pub trait File: Send + Sync {
     /// 从 offset 读取文件内容
     fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize, isize>;
     fn write_at(&self, offset: usize, buf: &[u8]) -> Result<usize, isize>;
+    ///可以获得OsInode结构体
+    fn as_any(&self) -> &dyn Any;
 }
 
 pub const S_IFREG: u32 = 0o100000; //普通文件
@@ -52,4 +55,25 @@ pub struct UserStat {
     pub st_size: i64,
     pub st_blksize: u32,
     pub st_blocks: u64,
+}
+
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub struct LinuxDirent64 {
+    ///索引节点号
+    pub d_ino: u64,
+    ///到下一个dirent的偏移
+    pub d_off: i64,
+    ///当前dirent的长度
+    pub d_reclen: u16,
+    ///文件类型
+    pub d_type: u8,
+    ///名字
+    pub d_name: [u8; 256], 
+}
+
+///仅仅作为dir_list()的返回值使用，字段还是比较少的
+pub struct DirEntry {
+    pub d_name: String,
+    pub is_dir: bool,
 }

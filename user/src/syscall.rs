@@ -6,6 +6,7 @@ const SYSCALL_MKDIRAT: usize = 34;
 const SYSCALL_OPEN: usize = 56;
 const SYSCALL_CLOSE: usize = 57;
 const SYSCALL_PIPE: usize = 59;
+const SYSCALL_GETDENTS: usize = 61;
 const SYSCALL_READ: usize = 63;
 const SYSCALL_WRITE: usize = 64;
 const SYSCALL_FSTAT: usize = 80;
@@ -132,4 +133,8 @@ pub fn sys_dup(fd: usize) -> isize {
 
 pub fn sys_dup3(old:isize, new:isize, flags:usize) -> isize {
     syscall(SYSCALL_DUP3, [old as usize, new as usize, flags, 0, 0, 0])
+}
+
+pub fn sys_getdents(fd:usize, buf:*mut u8, len:usize) -> isize {
+    syscall(SYSCALL_GETDENTS,[fd, buf as usize, len, 0, 0, 0])
 }

@@ -1,14 +1,15 @@
 use crate::fs::fat32::FAT_FS;
 use crate::fs::file::{Stat, UserStat, BLK_SIZE};
-use crate::fs::FatFsBlockDevice;
+use crate::fs::{DirEntry, FatFsBlockDevice};
 use crate::mm::UserBuffer;
 use crate::sync::UPIntrFreeCell;
 use crate::syscall::StatMode;
 use crate::task::current_process;
-use alloc::string::String;
+use alloc::string::{String, ToString};
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use bitflags::bitflags;
+use core::any::Any;
 use core::cell::UnsafeCell;
 use fatfs::{
     DefaultTimeProvider, Dir, File, FileSystem, LossyOemCpConverter, Read, Seek, SeekFrom, Write,
@@ -243,7 +244,6 @@ impl super::File for OSInode {
         self.path.clone()
     }
 
-
     /// 从 offset 读取文件内容
     fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize, isize> {
         // 获取内部可变访问权限
@@ -264,6 +264,7 @@ impl super::File for OSInode {
             FatType::Dir(_) => Err(-1),
         }
     }
+
     fn write_at(&self, offset: usize, buf: &[u8]) -> Result<usize, isize> {
         let mut inner = self.file.exclusive_access();
         match &mut *inner {
@@ -290,7 +291,37 @@ impl super::File for OSInode {
             FatType::Dir(_) => Err(-1),
         }
     }
+    ///可以直接获得OsInode结构体
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
 }
+impl OSInode {
+    pub fn list_dir(&self) -> Result<Vec<DirEntry>, isize> {
+        if !self.is_directory {
+            return Err(-1); // ENOTDIR
+        }
+
+        let inner = self.file.exclusive_access();
+
+        match &*inner {
+            FatType::Dir(dir) => {
+                let mut v = Vec::new();
+                for entry in dir.iter() {
+                    let entry = entry.map_err(|_| -1isize)?;
+                    v.push(DirEntry {
+                        d_name: entry.file_name(),
+                        is_dir: entry.is_dir(),
+                    });
+                }
+                Ok(v)
+            }
+            _ => Err(-1),
+        }
+    }
+}
+
+impl DirEntry {}
 
 impl Stat {
     pub fn update_after_write(&self, written: usize) {
@@ -401,6 +432,9 @@ pub fn open_file_at(
     mode: StatMode,
 ) -> Option<Arc<OSInode>> {
     let full_path = resolve_path(path, base_dir);
+    if full_path == "/" {
+        return Some(current_root_inode());
+    }
     let root_dir = ROOT_DIR.exclusive_access();
 
     // 尝试打开目录
@@ -475,14 +509,13 @@ pub fn create_dir(path: &str) -> Result<Arc<OSInode>, isize> {
 
     // 6. 封装成 OSInode
     Ok(Arc::new(OSInode::new(
-        true,                  // readable（目录可读）
-        false,                 // writable（fatfs 不支持写目录内容）
+        true,  // readable（目录可读）
+        false, // writable（fatfs 不支持写目录内容）
         FatType::Dir(dir),
-        true,                  // is_directory
+        true, // is_directory
         full_path,
     )))
 }
-
 
 /// 打开目录，返回 OSInode
 /// path 可以是绝对路径或相对路径
