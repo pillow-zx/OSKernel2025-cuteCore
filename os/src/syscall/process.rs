@@ -14,8 +14,9 @@ use crate::timer::{add_timer, get_time_ms, TimeSpec, TimeVal, TimeZone, Tms};
 use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
-use bitflags::bitflags;
 use core::mem::size_of;
+use bitflags::bitflags;
+use core::ops::AddAssign;
 
 pub fn sys_exit(exit_code: i32) -> ! {
     exit_current_and_run_next((exit_code & 0xff) << 8);
@@ -91,6 +92,8 @@ pub fn sys_mmap(
         Err(e) => e,               // 返回 -1
     }
 }
+
+
 
 // pub fn sys_fork() -> isize {
 //     let current_process = current_process();
@@ -254,6 +257,7 @@ bitflags! {
         const WNOWAIT    = 0x1000000;
     }
 }
+
 pub fn sys_wait4(pid: isize, status: *mut u32, option: u32, _ru: *mut Rusage) -> isize {
     let option = WaitOption::from_bits(option).unwrap();
     let task = current_task().unwrap();
@@ -285,6 +289,8 @@ pub fn sys_wait4(pid: isize, status: *mut u32, option: u32, _ru: *mut Rusage) ->
                 let found_pid = child.getpid();
                 // ++++ temporarily hold child lock
                 let exit_code = child_inner.exit_code;
+                inner.rusage.ru_cutime =inner.rusage.ru_cutime + child_inner.rusage.ru_utime;
+                inner.rusage.ru_cstime =inner.rusage.ru_cstime + child_inner.rusage.ru_stime;
                 if !status.is_null() {
                     *translated_refmut(token, status) = exit_code as u32;
                 }
@@ -414,10 +420,9 @@ pub fn sys_times(tms_ptr: *mut Tms) -> isize {
     let times = Tms {
         utime: inner.rusage.ru_utime.to_tick(),
         stime: inner.rusage.ru_stime.to_tick(),
-        cutime: 0,
-        cstime: 0,
+        cutime: inner.rusage.ru_cutime.to_tick(),
+        cstime: inner.rusage.ru_cstime.to_tick(),
     };
-    // TODO: copy date to user space
     copy_to_user(user_token, &times, tms_ptr);
     crate::hal::get_time() as isize
 }

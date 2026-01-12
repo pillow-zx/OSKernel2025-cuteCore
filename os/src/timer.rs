@@ -4,7 +4,7 @@ use crate::task::{wakeup_task, TaskControlBlock};
 use alloc::collections::BinaryHeap;
 use alloc::sync::Arc;
 use core::cmp::Ordering;
-use core::ops::{Add, Sub};
+use core::ops::{Add, AddAssign, Sub};
 use core::time::Duration;
 use lazy_static::lazy_static;
 

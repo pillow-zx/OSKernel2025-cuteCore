@@ -6,13 +6,11 @@ use core::cell::UnsafeCell;
 use fatfs::SeekFrom;
 
 pub trait File: Send + Sync {
-    // TODO：先给默认值，后续在改，否则impl File for OSInode的时候会报错
     fn readable(&self) -> bool;
     fn writable(&self) -> bool;
     fn read(&self, buf: UserBuffer) -> usize;
     fn write(&self, buf: UserBuffer) -> usize;
     fn get_stat(&self) -> UserStat;
-    // 默认返回，在impl File for OSInode里会覆盖
     fn is_dir(&self) -> bool;
     fn get_path(&self) -> String;
     /// 从 offset 读取文件内容
@@ -39,6 +37,13 @@ pub struct Stat {
     pub st_blksize: u32,
     pub __pad2: i32,
     pub st_blocks: UnsafeCell<u64>, // 占用 512B 块数
+    pub st_atime_sec: i64,
+    pub st_atime_nsec: i64,
+    pub st_mtime_sec: i64,
+    pub st_mtime_nsec: i64,
+    pub st_ctime_sec: i64,
+    pub st_ctime_nsec: i64,
+    pub __unused: [u32; 2],
 }
 
 ///由于既需要修改Stat又需要Copy特性所以分成两个了
@@ -52,9 +57,18 @@ pub struct UserStat {
     pub st_uid: u32,
     pub st_gid: u32,
     pub st_rdev: u64,
+    pub __pad: u64,
     pub st_size: i64,
     pub st_blksize: u32,
+    pub __pad2: i32,
     pub st_blocks: u64,
+    pub st_atime_sec: i64,
+    pub st_atime_nsec: i64,
+    pub st_mtime_sec: i64,
+    pub st_mtime_nsec: i64,
+    pub st_ctime_sec: i64,
+    pub st_ctime_nsec: i64,
+    pub __unused: [u32; 2],
 }
 
 #[repr(C)]
