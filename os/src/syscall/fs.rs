@@ -1,8 +1,8 @@
-use crate::fs::inode::{create_dir, OSInode};
+use crate::fs::inode::{create_dir, OSInode, ROOT_DIR};
 use crate::fs::{
-    open_dir, open_file, open_file_at, resolve_path, File, LinuxDirent64, OpenFlags, UserStat,
+    make_pipe, open_dir, open_file, open_file_at, resolve_path, File, LinuxDirent64, OpenFlags, UserStat,
 };
-use crate::mm::{copy_to_user, translated_byte_buffer, translated_str, UserBuffer};
+use crate::mm::{copy_to_user, translated_byte_buffer,translated_refmut, translated_str, UserBuffer};
 use crate::task::{current_process, current_task, current_user_token};
 use alloc::string::{String, ToString};
 use alloc::sync::Arc;
@@ -443,5 +443,148 @@ bitflags! {
         const S_IWOTH   =   0o0002;
         ///others have execute permission
         const S_IXOTH   =   0o0001;
+    }
+}
+
+pub fn sys_pipe2(pipefd: usize, flags: u32) -> isize {
+    let allowed = OpenFlags::NONBLOCK | OpenFlags::CLOEXEC;
+    let openflags = match OpenFlags::from_bits(flags) {
+        Some(f) => f,
+        None => return -1,
+    };
+    if (openflags.bits() & !allowed.bits()) != 0 {
+        return -1;
+    }
+    let process = current_process();
+    let token = current_user_token();
+    let mut inner = process.inner_exclusive_access();
+    let (pipe_read, pipe_write) = make_pipe();
+    if openflags.contains(OpenFlags::NONBLOCK) {
+        pipe_read.set_nonblocking(true);
+        pipe_write.set_nonblocking(true);
+    }
+    let read_fd = inner.alloc_fd();
+    inner.fd_table[read_fd] = Some(pipe_read);
+    let write_fd = inner.alloc_fd();
+    inner.fd_table[write_fd] = Some(pipe_write);
+    let pipe_ptr = pipefd as *mut i32;
+    *translated_refmut(token, pipe_ptr) = read_fd as i32;
+    *translated_refmut(token, unsafe { pipe_ptr.add(1) }) = write_fd as i32;
+    0
+}
+pub fn sys_unlinkat(dirfd: usize, path: *const u8, flags: u32) -> isize {
+    if path.is_null() {
+        return -1;
+    }
+    let task = current_task().unwrap();
+    let token = task.get_user_token();
+    let path = translated_str(token, path);
+    let base_dir = if dirfd == AT_FDCWD {
+        let process = current_process();
+        let cwd = {
+            let inner = process.inner_exclusive_access();
+            inner.cwd.clone()
+        };
+        cwd
+    } else {
+        let process = current_process();
+        let base = {
+            let inner = process.inner_exclusive_access();
+            match inner.fd_table.get(dirfd) {
+                Some(Some(f)) if f.is_dir() => Some(f.get_path()),
+                _ => None,
+            }
+        };
+        match base {
+            Some(s) => s,
+            None => return -1,
+        }
+    };
+    let full_path = resolve_path(path.as_str(), &base_dir);
+    let path_in_fs = full_path.strip_prefix("/").unwrap_or(&full_path);
+    let _remove_dir = (flags & 0x200) != 0;
+    let root_dir = ROOT_DIR.exclusive_access();
+    let res = root_dir.remove(path_in_fs);
+    match res {
+        Ok(_) => 0,
+        Err(_) => -1,
+    }
+}
+pub fn sys_umount2(target: *const u8, flags: u32) -> isize {
+    if target.is_null() {
+        return -1;
+    }
+    let token = current_user_token();
+    let target = translated_str(token, target);
+    let flags = UmountFlags::from_bits(flags);
+    if open_dir(target.as_str()).is_err() {
+        return -1;
+    }
+    0
+}
+bitflags! {
+    pub struct UmountFlags: u32 {
+        const MNT_FORCE           =   1;
+        const MNT_DETACH          =   2;
+        const MNT_EXPIRE          =   4;
+        const UMOUNT_NOFOLLOW     =   8;
+    }
+}
+pub fn sys_mount(
+    source: *const u8,
+    target: *const u8,
+    filesystemtype: *const u8,
+    mountflags: usize,
+    data: *const u8,
+) -> isize {
+    if source.is_null() || target.is_null() || filesystemtype.is_null() {
+        return -1;
+    }
+    let token = current_user_token();
+    let source = translated_str(token, source);
+    let target = translated_str(token, target);
+    let filesystemtype = translated_str(token, filesystemtype);
+    let mountflags = MountFlags::from_bits(mountflags).unwrap();
+    if open_dir(target.as_str()).is_err() {
+        return -1;
+    }
+
+    let fs_type = filesystemtype.as_str();
+    if fs_type != "vfat" && fs_type != "fat32" && fs_type != "vfat" {
+        return -1;
+    }
+    0
+}
+bitflags! {
+    pub struct MountFlags: usize {
+        const MS_RDONLY         =   1;
+        const MS_NOSUID         =   2;
+        const MS_NODEV          =   4;
+        const MS_NOEXEC         =   8;
+        const MS_SYNCHRONOUS    =   16;
+        const MS_REMOUNT        =   32;
+        const MS_MANDLOCK       =   64;
+        const MS_DIRSYNC        =   128;
+        const MS_NOATIME        =   1024;
+        const MS_NODIRATIME     =   2048;
+        const MS_BIND           =   4096;
+        const MS_MOVE           =   8192;
+        const MS_REC            =   16384;
+        const MS_SILENT         =   32768;
+        const MS_POSIXACL       =   1<<16;
+        const MS_UNBINDABLE     =   1<<17;
+        const MS_PRIVATE        =   1<<18;
+        const MS_SLAVE          =   1<<19;
+        const MS_SHARED         =   1<<20;
+        const MS_RELATIME       =   1<<21;
+        const MS_KERNMOUNT      =   1<<22;
+        const MS_I_VERSION      =   1<<23;
+        const MS_STRICTATIME    =   1<<24;
+        const MS_LAZYTIME       =   1<<25;
+        const MS_NOREMOTELOCK   =   1<<27;
+        const MS_NOSEC          =   1<<28;
+        const MS_BORN           =   1<<29;
+        const MS_ACTIVE         =   1<<30;
+        const MS_NOUSER         =   1<<31;
     }
 }

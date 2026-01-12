@@ -93,7 +93,7 @@ pub struct ProcessControlBlockInner {
     pub condvar_list: Vec<Option<Arc<Condvar>>>,
     pub rusage: Rusage,
     pub clock: ProcClock,
-    pub timer: [ITimerVal; 1],
+    pub timer: ITimerVal,
     pub tgid: usize,
 }
 
@@ -145,7 +145,7 @@ impl ProcessControlBlock {
                     condvar_list: Vec::new(),
                     rusage: Rusage::new(),
                     clock: ProcClock::new(),
-                    timer: [ITimerVal::new(); 1],
+                    timer: ITimerVal::new(),
                     tgid,
                 })
             },
@@ -364,7 +364,7 @@ impl ProcessControlBlock {
                     condvar_list: Vec::new(),
                     rusage: Rusage::new(),
                     clock: ProcClock::new(),
-                    timer: [ITimerVal::new(); 1],
+                    timer: ITimerVal::new(),
                     tgid,
                 })
             },
@@ -477,15 +477,15 @@ impl ProcessControlBlockInner {
     /// 更新实时定时器
     pub fn update_itimer_real_if_exists(&mut self, diff: TimeVal) {
         // 如果当前定时器不为0
-        if !self.timer[0].it_value.is_zero() {
+        if !self.timer.it_value.is_zero() {
             // 更新定时器
-            self.timer[0].it_value = self.timer[0].it_value - diff;
+            self.timer.it_value = self.timer.it_value - diff;
             // 如果定时器为0
-            if self.timer[0].it_value.is_zero() {
+            if self.timer.it_value.is_zero() {
                 // 添加信号
                 self.add_signal(SignalFlags::SIGALRM);
                 // 重置定时器
-                self.timer[0].it_value = self.timer[0].it_interval;
+                self.timer.it_value = self.timer.it_interval;
             }
         }
     }
@@ -499,13 +499,17 @@ pub struct Rusage {
     pub ru_utime: TimeVal,
     // system CPU time used
     pub ru_stime: TimeVal,
+    pub ru_cutime: TimeVal,
+    pub ru_cstime: TimeVal,
 }
 impl Rusage {
     pub fn new() -> Self {
         Self {
             ru_utime: TimeVal::new(),
             ru_stime: TimeVal::new(),
-        }
+            ru_cutime: TimeVal::new(),
+            ru_cstime: TimeVal::new(),
+        } 
     }
 }
 #[repr(C)]

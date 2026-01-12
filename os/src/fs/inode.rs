@@ -152,8 +152,14 @@ bitflags! {
         const CREATE = 1 << 6;
         // 截断（若存在则以可写方式打开，但是长度清空为0）
         const TRUNC = 1 << 10;
+        // 非阻塞模式
+        const NONBLOCK = 1 << 12;
+        // 执行时关闭
+        const CLOEXEC = 1 << 20;
         //
         const DIRECTORY = 1 << 21;
+        // 尽量减少缓存影响（如O_DIRECT）
+        const DIRECT = 1 << 24;
     }
 }
 

@@ -6,13 +6,11 @@ use core::cell::UnsafeCell;
 use fatfs::SeekFrom;
 
 pub trait File: Send + Sync {
-    // TODO：先给默认值，后续在改，否则impl File for OSInode的时候会报错
     fn readable(&self) -> bool;
     fn writable(&self) -> bool;
     fn read(&self, buf: UserBuffer) -> usize;
     fn write(&self, buf: UserBuffer) -> usize;
     fn get_stat(&self) -> UserStat;
-    // 默认返回，在impl File for OSInode里会覆盖
     fn is_dir(&self) -> bool;
     fn get_path(&self) -> String;
     /// 从 offset 读取文件内容
