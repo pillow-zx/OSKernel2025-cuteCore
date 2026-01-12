@@ -70,6 +70,13 @@ impl OSInode {
                 st_blksize: BLK_SIZE,
                 __pad2: 0,
                 st_blocks: UnsafeCell::new(st_blocks),
+                st_atime_sec: 0,
+                st_atime_nsec: 0,
+                st_mtime_sec: 0,
+                st_mtime_nsec: 0,
+                st_ctime_sec: 0,
+                st_ctime_nsec: 0,
+                __unused: [0; 2],
             },
             file: unsafe { UPIntrFreeCell::new(file) },
             is_directory,
@@ -221,7 +228,6 @@ impl super::File for OSInode {
                 }
             }
         }
-
         self.stat.update_after_write(total_write_size);
         total_write_size
     }
@@ -235,9 +241,18 @@ impl super::File for OSInode {
                 st_uid: self.stat.st_uid,
                 st_gid: self.stat.st_gid,
                 st_rdev: self.stat.st_rdev,
+                __pad: self.stat.__pad,
                 st_size: *self.stat.st_size.get(),
                 st_blksize: self.stat.st_blksize,
+                __pad2: self.stat.__pad2,
                 st_blocks: *self.stat.st_blocks.get(),
+                st_ctime_sec: self.stat.st_atime_sec,
+                st_ctime_nsec: self.stat.st_atime_nsec,
+                st_atime_sec: self.stat.st_atime_sec,
+                st_atime_nsec: self.stat.st_atime_nsec,
+                st_mtime_sec: self.stat.st_mtime_sec,
+                st_mtime_nsec: self.stat.st_mtime_nsec,
+                __unused: [0; 2],
             }
         }
     }

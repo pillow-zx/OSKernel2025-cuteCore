@@ -82,14 +82,16 @@ pub fn syscall(syscall_id: usize, args: [usize; 6]) -> isize {
             args[3],
             args[4] as *const u8,
         ),
-        SYSCALL_MMAP => sys_mmap(
+        SYSCALL_MMAP => {
+            println!("mmap test {:#?}", args);
+            sys_mmap(
             args[0],
             args[1],
             args[2],
             args[3],
             args[4] as isize,
             args[5],
-        ),
+        )},
         SYSCALL_GET_TIME_OF_DAY => sys_gettimeofday(
             args[0] as *mut crate::timer::TimeVal,
             args[1] as *mut crate::timer::TimeZone,

@@ -213,11 +213,10 @@ impl<T: PageTable> MemorySet<T> {
         start: usize,
         len: usize,
         prot: usize,                                   //内存权限
-        _flags: usize,                                 //映射类型
+        flags: usize,                                 //映射类型
         file_arc: Option<Arc<dyn File + Send + Sync>>, //文件句柄
         off: usize,                                    //文件偏移
     ) -> Result<usize, isize> {
-        // println!("[mmap]start:{},len:{},port:{},flags:{},off:{}",start,len,prot,flags,off);
         if len == 0 {
             return Err(-1);
         }
@@ -239,7 +238,6 @@ impl<T: PageTable> MemorySet<T> {
 
         let start_vpn = start_va.floor();
         let end_vpn = end_va.ceil();
-        // println!("[mmap]start_vpn: {:?}, end_vpn: {:?}", start_vpn, end_vpn);
         // 检查 VMA 冲突
         for area in self.areas.iter() {
             if area.check_overlapping(start_vpn, end_vpn).is_some() {

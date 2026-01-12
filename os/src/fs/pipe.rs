@@ -3,7 +3,7 @@ use crate::mm::UserBuffer;
 use crate::sync::UPIntrFreeCell;
 use alloc::string::String;
 use alloc::sync::{Arc, Weak};
-
+use core::any::Any;
 use crate::fs::file::BLK_SIZE;
 use crate::task::suspend_current_and_run_next;
 
@@ -199,9 +199,18 @@ impl super::File for Pipe {
             st_uid: 0,
             st_gid: 0,
             st_rdev: 0,
+            __pad: 0,
             st_size: 0,
             st_blksize: BLK_SIZE,
+            __pad2: 0,
             st_blocks: 0,
+            st_atime_sec: 0,
+            st_atime_nsec: 0,
+            st_mtime_sec: 0,
+            st_mtime_nsec: 0,
+            st_ctime_sec: 0,
+            st_ctime_nsec: 0,
+            __unused: [0; 2],
         }
     }
 
@@ -237,5 +246,9 @@ impl super::File for Pipe {
             write_cnt += 1;
         }
         Ok(write_cnt)
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        todo!()
     }
 }
